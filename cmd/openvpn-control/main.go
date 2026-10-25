@@ -411,8 +411,7 @@ func main() {
 	mux.HandleFunc("POST /clients/{name}/delete", a.auth(a.deleteClient))
 	mux.HandleFunc("POST /clients/{name}/comment", a.auth(a.editComment))
 	mux.HandleFunc("GET /clients/{name}/download", a.auth(a.downloadClient))
-	mux.HandleFunc("POST /profile-settings", a.auth(a.updateProfileSettings))
-	mux.HandleFunc("GET /assets/style.css", func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc("GET /assets/style.css", func(w http.ResponseWriter, r *http.Request) {
 		serveAsset(w, "web/style.css", "text/css; charset=utf-8")
 	})
 	mux.HandleFunc("GET /assets/app.js", func(w http.ResponseWriter, r *http.Request) {
@@ -861,42 +860,28 @@ func (a *App) editComment(w http.ResponseWriter, r *http.Request) {
 }
 func (a *App) loadProfileSettings() error {
     a.profile = defaultProfile(a.cfg.VPNPort)
+    a.profile.ExternalHost = a.cfg.VPNHost
+    a.profile.Template = ""
     b, err := os.ReadFile(filepath.Join(statePath, profileSettingsFile))
     if errors.Is(err, os.ErrNotExist) { return nil }
     if err != nil { return err }
-    if err := json.Unmarshal(b, &a.profile); err != nil { return err }
-    if err := validateProfileTemplate(a.profile.Template); err != nil { return err }
-    if a.profile.ExternalPort < 1 || a.profile.ExternalPort > 65535 {
-        return fmt.Errorf("invalid saved profile external port")
+    var stored ProfileSettings
+    if err := json.Unmarshal(b, &stored); err != nil { return err }
+    if stored.ExternalHost == "" { stored.ExternalHost = a.cfg.VPNHost }
+    if stored.Template != "" {
+        for _, line := range strings.Split(stored.Template, "\n") {
+            fields := strings.Fields(line)
+            if len(fields) == 2 && fields[0] == "verb" {
+                if n, err := strconv.Atoi(fields[1]); err == nil { stored.Verb = n }
+            }
+        }
     }
+    stored.Template = ""
+    if !validProfileInputs(stored.ExternalHost, stored.ExternalPort, stored.Verb) {
+        return fmt.Errorf("invalid stored client profile defaults")
+    }
+    a.profile = stored
     return nil
-}
-func (a *App) updateProfileSettings(w http.ResponseWriter, r *http.Request) {
-    externalPort, err := strconv.Atoi(strings.TrimSpace(r.FormValue("external_port")))
-    if err != nil || externalPort < 1 || externalPort > 65535 {
-        http.Error(w, "External port must be between 1 and 65535", http.StatusBadRequest)
-        return
-    }
-    tmpl := strings.ReplaceAll(r.FormValue("profile_template"), "\r\n", "\n")
-    tmpl = strings.TrimSpace(tmpl) + "\n"
-    if err := validateProfileTemplate(tmpl); err != nil {
-        http.Error(w, "Invalid .ovpn template: "+err.Error(), http.StatusBadRequest)
-        return
-    }
-    settings := ProfileSettings{ExternalPort: externalPort, Template: tmpl}
-    b, err := json.MarshalIndent(settings, "", "  ")
-    if err != nil { http.Error(w, "Could not encode settings", 500); return }
-    a.mu.Lock()
-    err = atomicWrite(filepath.Join(statePath, profileSettingsFile), b, 0600)
-    if err == nil { a.profile = settings }
-    a.mu.Unlock()
-    if err != nil {
-        log.Printf("profile settings save: %v", err)
-        http.Error(w, "Could not save profile settings", 500)
-        return
-    }
-    audit("profile-settings-updated", "admin")
-    http.Redirect(w, r, "/?msg=profile-saved#profile-settings", http.StatusSeeOther)
 }
 func (a *App) downloadClient(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
@@ -918,7 +903,11 @@ func (a *App) downloadClient(w http.ResponseWriter, r *http.Request) {
 		{filepath.Join(easyrsaDir, "pki/private", name+".key"), "<key>", "</key>"},
 		{filepath.Join(vpnServerDir, "ta.key"), "<tls-crypt>", "</tls-crypt>"},
 	}
-	header, err := buildProfileHeader(profile, a.cfg.VPNHost, a.cfg.VPNProto)
+	host, port, verb := profile.ExternalHost, profile.ExternalPort, profile.Verb
+    if c.ProfileConfigured {
+        host, port, verb = c.ExternalHost, c.ExternalPort, c.Verb
+    }
+    header, err := generateClientHeader(host, port, verb, a.cfg.VPNProto)
     if err != nil { log.Printf("invalid profile settings: %v", err); http.Error(w, "profile settings unavailable", 500); return }
     var sb strings.Builder
     sb.WriteString(strings.TrimRight(header, "\n"))
