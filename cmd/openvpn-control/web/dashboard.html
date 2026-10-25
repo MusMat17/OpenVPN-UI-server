@@ -1,0 +1,45 @@
+{{define "dashboard.html"}}<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><title>OpenVPN Control — Overview</title><link rel="stylesheet" href="/assets/style.css"><script src="/assets/app.js" defer></script></head>
+<body class="bento-ui"><div class="bento-app">
+<aside class="bento-side">
+  <a class="brand" href="/"><span class="brand-icon">◈</span><span>openvpn<span class="brand-sub">control / studio</span></span></a>
+  <div class="nav-caption">WORKSPACE</div>
+  <nav class="bento-nav"><a class="selected" href="#overview"><span>◫</span> Обзор</a><a href="#clients"><span>♧</span> Клиенты</a><a href="#add-client"><span>⊕</span> Новый клиент</a></nav>
+  <div class="side-status"><span class="pulse-dot"></span><div><strong>Debian 13</strong><small>Private network · local</small></div></div>
+</aside>
+<main class="bento-main" id="overview">
+<header class="bento-top"><div><div class="subheading">NETWORK CONTROL CENTER <span class="tiny-purple">✦</span></div><h1>Обзор сети<span class="title-dot">.</span></h1><p>Все подключения и сертификаты — в одном пространстве.</p></div><div class="header-tools"><span class="secure-indicator">● Защищено HTTPS</span><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button type="submit" class="soft-btn">Выйти ↗</button></form></div></header>
+{{if .Message}}<div class="bento-toast">✓ Изменения сохранены</div>{{end}}
+<section class="bento-stats" aria-label="Основные показатели">
+<article class="b-card light-stat"><div class="card-topline"><span>Всего клиентов</span><span class="card-glyph">◎</span></div><strong class="metric">{{.Total}}<small>профилей</small></strong><div class="metric-caption">Созданные сертификаты</div><div class="meter-track"><span style="width:67%"></span></div></article>
+<article class="b-card peach-stat"><div class="card-topline"><span>Онлайн сейчас</span><span class="card-glyph">↗</span></div><strong class="metric">{{.Active}}<small>активны</small></strong><div class="metric-caption">Подключения клиентов</div><span class="tiny-sparks">✳ ✦ ✴</span></article>
+</section>
+<section class="b-card clients-section" id="clients"><div class="section-head"><div><div class="subheading">VPN DIRECTORY</div><h2>Клиенты</h2><p>Управление доступом, сертификатами и профилями.</p></div><a class="bento-primary small-primary" href="#add-client">+ Новый клиент</a></div>
+<div class="bento-table-wrap"><table class="bento-table"><thead><tr><th>КЛИЕНТ</th><th>СТАТУС</th><th>СРОК ДЕЙСТВИЯ</th><th>КОММЕНТАРИЙ</th><th>ДЕЙСТВИЯ</th></tr></thead><tbody>
+{{range .Rows}}<tr><td><div class="client-entry"><span class="client-monogram">{{slice .Name 0 1}}</span><div><strong>{{.Name}}</strong><small>{{if .Online}}{{.VirtualIP}}{{else}}VPN profile{{end}}</small></div></div></td><td>{{if .Disabled}}<span class="bento-pill off">Заблокирован</span>{{else if .Online}}<span class="bento-pill on">● Онлайн</span>{{else}}<span class="bento-pill">Не в сети</span>{{end}}</td><td><strong>{{.ExpiresAt.Format "02.01.2006"}}</strong><small class="muted-inline">{{.Days}} дней</small></td><td><form class="inline-comment" method="post" action="/clients/{{.Name}}/comment"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="text" name="comment" maxlength="256" value="{{.Comment}}" placeholder="Комментарий"><button title="Сохранить" type="submit">✓</button></form></td><td><div class="bento-actions"><a href="/clients/{{.Name}}/download">↓ .ovpn</a>{{if .Disabled}}<form action="/clients/{{.Name}}/enable" method="post"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button type="submit">Включить</button></form>{{else}}<form action="/clients/{{.Name}}/disable" method="post"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button type="submit">Отключить</button></form>{{end}}<form action="/clients/{{.Name}}/delete" method="post" data-confirm="Отозвать сертификат {{.Name}}? Это необратимо."><input name="csrf" type="hidden" value="{{$.CSRF}}"><button class="danger-action" type="submit">Удалить</button></form></div></td></tr>
+{{else}}<tr><td colspan="5" class="table-empty">Пока нет сертификатов. <a href="#add-client">Создать первого клиента →</a></td></tr>{{end}}
+</tbody></table></div></section>
+<section id="add-client" class="bento-create"><div class="section-head create-heading"><div><div class="subheading">NEW ACCESS</div><h2>Новый клиент<span class="title-dot">.</span></h2><p>Параметры сертификата и внешнего подключения.</p></div><span class="create-spark">✳</span></div>
+<form id="new-client-form" class="create-bento-grid" method="post" action="/clients"><input type="hidden" name="csrf" value="{{.CSRF}}">
+<article class="b-card form-card"><div class="step-title"><span class="step-number">01</span><div><h3>Сертификат клиента</h3><p>Идентификация и срок действия</p></div></div><div class="form-stack"><label>Имя клиента<input name="name" required maxlength="48" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,47}" placeholder="office-laptop" autocomplete="off"><small>Латиница, цифры, «-» и «_»</small></label><label>Срок действия, дней<input name="days" type="number" min="1" max="3650" value="365" required></label><label>Комментарий<input name="comment" maxlength="256" placeholder="Например: рабочий ноутбук"></label></div></article>
+<article class="b-card form-card connection-card"><div class="step-title"><span class="step-number purple-number">02</span><div><h3>Параметры подключения</h3><p>Только три изменяемых значения</p></div></div><div class="form-stack"><label>Внешний IP / DNS<input id="external_host" name="external_host" value="{{.ExternalHost}}" required maxlength="253" placeholder="vpn.example.org" autocomplete="off"></label><div class="form-dual"><label>Внешний порт<input id="external_port" name="external_port" type="number" min="1" max="65535" value="{{.ExternalPort}}" required></label><label>Verb<select id="verb" name="verb"><option value="0" {{if eq .Verb 0}}selected{{end}}>0</option><option value="1" {{if eq .Verb 1}}selected{{end}}>1</option><option value="2" {{if eq .Verb 2}}selected{{end}}>2</option><option value="3" {{if eq .Verb 3}}selected{{end}}>3</option><option value="4" {{if eq .Verb 4}}selected{{end}}>4</option><option value="5" {{if eq .Verb 5}}selected{{end}}>5</option><option value="6" {{if eq .Verb 6}}selected{{end}}>6</option><option value="7" {{if eq .Verb 7}}selected{{end}}>7</option><option value="8" {{if eq .Verb 8}}selected{{end}}>8</option><option value="9" {{if eq .Verb 9}}selected{{end}}>9</option><option value="10" {{if eq .Verb 10}}selected{{end}}>10</option><option value="11" {{if eq .Verb 11}}selected{{end}}>11</option></select></label></div><div class="readonly-meta"><span>Получено из сервера</span><strong>{{.ClientProto}} / {{.VPNPort}}</strong><small>Протокол и внутренний порт не редактируются</small></div></div></article>
+<article class="b-card preview-card"><div class="preview-top"><div><span class="subheading">AUTO-GENERATED</span><h3>Предпросмотр .ovpn</h3></div><span class="bento-pill on">● Sync</span></div><pre id="profile-preview">client
+dev tun
+proto {{.ClientProto}}
+remote {{.ExternalHost}} {{.ExternalPort}}
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+auth-nocache
+pull-filter ignore "redirect-gateway"
+verb {{.Verb}}
+&lt;ca&gt; … &lt;/ca&gt;
+&lt;cert&gt; … &lt;/cert&gt;
+&lt;key&gt; … &lt;/key&gt;
+&lt;tls-crypt&gt; … &lt;/tls-crypt&gt;</pre><p>Все остальные параметры и криптографические материалы определяет сервер.</p></article>
+<div class="create-submit"><span>Новый клиент получит сертификат и готовый профиль для скачивания.</span><button class="bento-primary" type="submit">Создать клиента <span>↗</span></button></div>
+</form></section>
+<footer class="bento-footer"><span>OPENVPN CONTROL / PRIVATE NETWORK</span><span>Debian 13 · {{.Now}}</span></footer>
+</main></div></body></html>{{end}}

@@ -1,0 +1,15 @@
+# Builds and private server data
+*.ovpn
+*.key
+*.pem
+*.p12
+clients.json
+disabled.list
+config.json
+management.pass
+.env
+.DS_Store
+*.test
+*.out
+__pycache__/
+*.pyc

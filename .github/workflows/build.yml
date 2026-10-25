@@ -1,0 +1,27 @@
+name: Build and test OpenVPN Control
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Test
+        run: go test ./... && go vet ./...
+      - name: Validate install script
+        run: bash -n install.sh && bash -n build.sh
+      - name: Build static Linux binary
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o openvpn-control-linux-amd64 ./cmd/openvpn-control
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openvpn-control-linux-amd64
+          path: openvpn-control-linux-amd64
