@@ -1,0 +1,36 @@
+name: Publish experimental alpha
+on:
+  push:
+    branches:
+      - feature/openvpn-control-hyperos4
+permissions:
+  contents: write
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Validate tests
+        run: |
+          go test ./...
+          go vet ./...
+          python3 -m unittest discover -s tests
+          bash -n install.sh
+          bash -n build.sh
+      - name: Build Linux AMD64
+        run: |
+          ./build.sh
+          cd bin
+          sha256sum openvpn-control-linux-amd64 > SHA256SUMS
+      - name: Publish experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.1.0-alpha >/dev/null 2>&1; then
+            gh release upload v0.1.0-alpha bin/openvpn-control-linux-amd64 bin/SHA256SUMS --clobber
+          else
+            gh release create v0.1.0-alpha bin/openvpn-control-linux-amd64 bin/SHA256SUMS --prerelease --target "$GITHUB_SHA" --title "OpenVPN Control v0.1.0-alpha" --notes "EXPERIMENTAL. Test on a fresh Debian 13 VM only. Not production-ready. Never expose admin TCP/8989 to the internet."
+          fi
