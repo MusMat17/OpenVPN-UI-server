@@ -82,7 +82,9 @@ type App struct {
 // alters the OpenVPN daemon's listening port, certificates or NAT rules.
 type ProfileSettings struct {
     ExternalPort int    `json:"external_port"`
-    Template     string `json:"template"`
+    ExternalHost string `json:"external_host,omitempty"`
+    Verb int `json:"verb"`
+    Template string `json:"template,omitempty"`
 }
 
 const defaultProfileTemplate = `client
@@ -176,8 +178,11 @@ type Row struct {
 type View struct {
 	Rows                                           []Row
 	CSRF, Message, VPNPort, VPNProto, LAN, VPNHost string
-	ExternalPort int
-	ProfileTemplate string
+    ExternalPort int
+    ExternalHost string
+    Verb int
+    BindIP string
+    ClientProto string
 	Active                                         int
 	Total                                          int
 	Now                                            string
@@ -495,7 +500,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			active++
 		}
 	}
-	v := View{Rows: rows, Active: active, Total: len(rows), CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalPort: profile.ExternalPort, ProfileTemplate: profile.Template, Now: time.Now().Format("02.01.2006 15:04")}
+	v := View{Rows: rows, Active: active, Total: len(rows), CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalHost: profile.ExternalHost, ExternalPort: profile.ExternalPort, Verb: profile.Verb, BindIP: a.cfg.BindIP, ClientProto: map[bool]string{true:"tcp-client",false:"udp"}[a.cfg.VPNProto == "tcp"], Now: time.Now().Format("02.01.2006 15:04")}
 	if e := a.t.ExecuteTemplate(w, "dashboard.html", v); e != nil {
 		log.Print(e)
 	}
