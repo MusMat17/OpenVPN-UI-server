@@ -145,6 +145,8 @@ func validateProfileTemplate(t string) error {
         if !ok { return fmt.Errorf("required directive missing: %s", directive) }
     }
     return nil
+}
+
 var externalHostRE = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}$`)
 func validExternalHost(s string) bool {
     if !externalHostRE.MatchString(s) { return false }
