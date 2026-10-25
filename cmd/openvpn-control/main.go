@@ -271,15 +271,21 @@ func (a *App) consumeLoginToken(token string) bool {
     return ok && time.Now().Before(deadline)
 }
 
-// POST /login must come from this same HTTPS origin. A one-time form token alone
-// does not bind a request to a browser, so require Origin or Fetch Metadata too.
+// A server-issued, unpredictable, one-time form token is the primary login
+// CSRF defense. Fetch metadata and Origin provide defense in depth when present.
+// Older browsers and some privacy settings omit these headers: absence alone
+// must not lock an administrator out of an otherwise valid same-origin form.
 func sameOriginLogin(r *http.Request) bool {
-    origin := r.Header.Get("Origin")
-    if origin != "" {
-        u, err := url.Parse(origin)
-        return err == nil && u.Scheme == "https" && u.Host == r.Host && u.Path == "" && u.RawQuery == "" && u.Fragment == ""
+    if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+        return false
     }
-    return r.Header.Get("Sec-Fetch-Site") == "same-origin"
+    origin := r.Header.Get("Origin")
+    if origin == "" || origin == "null" {
+        return true // one-time nonce is still mandatory
+    }
+    u, err := url.Parse(origin)
+    return err == nil && u.Scheme == "https" && u.Host == r.Host &&
+        u.Path == "" && u.RawQuery == "" && u.Fragment == ""
 }
 
 func ipOf(r *http.Request) string {
@@ -303,8 +309,19 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", 400)
 		return
 	}
-	if !sameOriginLogin(r) || !a.consumeLoginToken(r.FormValue("csrf")) {
-        // Fresh GET /login issues a new nonce. Invalid tokens cannot authenticate.
+    if !sameOriginLogin(r) {
+        log.Printf("login csrf rejected: origin or fetch-metadata check")
+        http.Redirect(w, r, "/login?error=csrf", http.StatusSeeOther)
+        return
+    }
+    token := r.FormValue("csrf")
+    if !a.consumeLoginToken(token) {
+        // Never log tokens or passwords. A fresh GET issues a replacement nonce.
+        if token == "" {
+            log.Printf("login csrf rejected: form token absent")
+        } else {
+            log.Printf("login csrf rejected: form token unknown, reused or expired")
+        }
         http.Redirect(w, r, "/login?error=csrf", http.StatusSeeOther)
         return
     }
