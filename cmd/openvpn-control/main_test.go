@@ -172,3 +172,52 @@ func TestProfileTemplateValidation(t *testing.T) {
         if _, err := buildProfileHeader(settings, "vpn.example.net", "tcp"); err == nil { t.Errorf("invalid port %d accepted", port) }
     }
 }
+
+func TestBentoDashboardRendersWithRealClients(t *testing.T) {
+    tpl, err := template.New("pages").Funcs(template.FuncMap{"size": humanBytes}).ParseFS(webFS, "web/*.html")
+    if err != nil { t.Fatalf("parse HTML dashboard: %v", err) }
+    sample := View{
+        CSRF: "csrf-test", VPNProto: "TCP", VPNPort: "1194", BindIP: "192.168.40.10",
+        ClientProto: "tcp-client", LAN: "192.168.40.0/24", ExternalHost: "vpn.example.net",
+        ExternalPort: 2253, Verb: 0, Active: 1, Total: 1,
+        Rows: []Row{{Client: Client{Name: "laptop-01", Comment: "Notebook", Days: 365,
+            ExpiresAt: time.Now().Add(365*24*time.Hour)}}},
+    }
+    var out strings.Builder
+    if err := tpl.ExecuteTemplate(&out, "dashboard.html", sample); err != nil {
+        t.Fatalf("render dashboard: %v", err)
+    }
+    for _, expected := range []string{
+        "vpn.example.net", "2253", "1194", "csrf-test", "laptop-01",
+        "/clients/laptop-01/download", "/clients/laptop-01/disable",
+        "/clients/laptop-01/delete", "/clients/laptop-01/comment",
+        "name=\"external_host\"", "name=\"external_port\"", "name=\"verb\"",
+    } {
+        if !strings.Contains(out.String(), expected) { t.Errorf("dashboard missing %q", expected) }
+    }
+}
+func TestServerControlledClientProfile(t *testing.T) {
+    config, err := generateClientHeader("vpn.example.net", 2253, 0, "tcp")
+    if err != nil { t.Fatal(err) }
+    for _, piece := range []string{
+        "proto tcp-client", "remote vpn.example.net 2253", "verb 0",
+        "remote-cert-tls server", "pull-filter ignore \"redirect-gateway\"",
+    } {
+        if !strings.Contains(config, piece) { t.Errorf("profile missing %q", piece) }
+    }
+    for _, host := range []string{"foo bar", "host\nredirect-gateway", "https://host", "", "-bad.example"} {
+        if _, err := generateClientHeader(host, 2253, 0, "tcp"); err == nil {
+            t.Errorf("unsafe host %q accepted", host)
+        }
+    }
+    for _, p := range []int{0, -10, 65536} {
+        if _, err := generateClientHeader("vpn.example.net", p, 0, "udp"); err == nil {
+            t.Errorf("invalid port %d accepted", p)
+        }
+    }
+    for _, v := range []int{-1, 12} {
+        if _, err := generateClientHeader("vpn.example.net", 2253, v, "udp"); err == nil {
+            t.Errorf("invalid verb %d accepted", v)
+        }
+    }
+}
