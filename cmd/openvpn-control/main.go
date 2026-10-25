@@ -148,6 +148,176 @@ func validateProfileTemplate(t string) error {
     return nil
 }
 
+var externalHostRE = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}package main
+
+import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"crypto/tls"
+	"crypto/x509"
+	"embed"
+	"encoding/base64"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"html/template"
+	"io"
+	"log"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"unicode/utf8"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+//go:embed web/*
+var webFS embed.FS
+
+const (
+	defaultConf  = "/etc/openvpn-control/config.json"
+	statePath    = "/var/lib/openvpn-control"
+	easyrsaDir   = "/etc/openvpn-control/easy-rsa"
+	vpnServerDir = "/etc/openvpn/server"
+)
+
+var cnPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,47}$`)
+
+type Config struct {
+	BindIP    string `json:"bind_ip"`
+	Port      int    `json:"port"`
+	VPNPort   int    `json:"vpn_port"`
+	VPNProto  string `json:"vpn_proto"`
+	VPNHost   string `json:"vpn_host"`
+	LAN       string `json:"lan"`
+	VPNNet    string `json:"vpn_net"`
+	AdminHash string `json:"admin_hash"`
+	CertFile  string `json:"cert_file"`
+	KeyFile   string `json:"key_file"`
+}
+type Client struct {
+	Name      string    `json:"name"`
+	Comment   string    `json:"comment"`
+	Days      int       `json:"days"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	Disabled  bool      `json:"disabled"`
+	Deleted   bool      `json:"deleted"`
+	Revoked   bool      `json:"revoked"`
+    ExternalHost string `json:"external_host,omitempty"`
+    ExternalPort int `json:"external_port,omitempty"`
+    Verb int `json:"verb"`
+    ProfileConfigured bool `json:"profile_configured,omitempty"`
+}
+type App struct {
+	mu       sync.Mutex
+	profile  ProfileSettings
+	cfg      Config
+	clients  map[string]Client
+	sessions map[string]Session
+	loginTokens map[string]time.Time
+	tries    map[string]Attempt
+	t        *template.Template
+}
+// ProfileSettings only controls newly downloaded .ovpn files. It never
+// alters the OpenVPN daemon's listening port, certificates or NAT rules.
+type ProfileSettings struct {
+    ExternalPort int    `json:"external_port"`
+    ExternalHost string `json:"external_host,omitempty"`
+    Verb int `json:"verb"`
+    Template string `json:"template,omitempty"`
+}
+
+const defaultProfileTemplate = `client
+dev tun
+proto {{PROTO}}
+remote {{HOST}} {{PORT}}
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+auth-nocache
+pull-filter ignore "redirect-gateway"
+verb 0
+`
+
+const profileSettingsFile = "profile-settings.json"
+
+func defaultProfile(port int) ProfileSettings {
+    return ProfileSettings{ExternalPort: port, Template: defaultProfileTemplate}
+}
+
+// validateProfileTemplate rejects malformed templates and requires the
+// split-tunnel and TLS protections. Inline credentials are appended separately.
+func validateProfileTemplate(t string) error {
+    if len(t) == 0 || len(t) > 16384 || !utf8.ValidString(t) || strings.ContainsAny(t, "\x00\r") {
+        return fmt.Errorf("template must be valid UTF-8 (1–16384 bytes), without CR or NUL")
+    }
+    for _, token := range []string{"{{HOST}}", "{{PORT}}", "{{PROTO}}"} {
+        if strings.Count(t, token) != 1 { return fmt.Errorf("template must contain %s exactly once", token) }
+    }
+    if strings.Count(t, "{{") != 3 || strings.Count(t, "}}") != 3 {
+        return fmt.Errorf("unsupported placeholder: use only {{HOST}}, {{PORT}}, {{PROTO}}")
+    }
+    lines := strings.Split(t, "\n")
+    required := map[string]bool{
+        "client": false, "dev tun": false, "proto {{PROTO}}": false,
+        "remote {{HOST}} {{PORT}}": false,
+        "remote-cert-tls server": false,
+        `pull-filter ignore "redirect-gateway"`: false,
+    }
+    for _, line := range lines {
+        line = strings.TrimSpace(line)
+        if strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") || line == "" { continue }
+        if strings.HasPrefix(line, "<") || strings.HasPrefix(line, ">") {
+            return fmt.Errorf("inline certificate blocks are managed by the server, not the template")
+        }
+        if _, ok := required[line]; ok { required[line] = true }
+        fields := strings.Fields(line)
+        if len(fields) > 0 {
+            switch strings.ToLower(fields[0]) {
+            case "ca", "cert", "key", "tls-crypt", "tls-auth", "auth-user-pass",
+                 "script-security", "up", "down", "plugin", "management", "askpass":
+                return fmt.Errorf("directive %q is managed by the system or not allowed", fields[0])
+            }
+        }
+    }
+    for directive, ok := range required {
+        if !ok { return fmt.Errorf("required directive missing: %s", directive) }
+    }
+    return nil
+}
+
+)
+func validExternalHost(s string) bool {
+    if !externalHostRE.MatchString(s) { return false }
+    if ip := net.ParseIP(s); ip != nil { return ip.To4() != nil }
+    for _, item := range strings.Split(s, ".") {
+        if len(item) == 0 || len(item) > 63 || strings.HasPrefix(item, "-") || strings.HasSuffix(item, "-") { return false }
+    }
+    return true
+}
+func validProfileInputs(host string, port, verb int) bool {
+    return validExternalHost(host) && port >= 1 && port <= 65535 && verb >= 0 && verb <= 11
+}
+// Generate a fixed, security-controlled client header using the installed server protocol.
+func generateClientHeader(host string, port, verb int, serverProtocol string) (string, error) {
+    if !validProfileInputs(host, port, verb) { return "", fmt.Errorf("invalid external connection parameters") }
+    proto := "udp"
+    if serverProtocol == "tcp" { proto = "tcp-client" }
+    return fmt.Sprintf("client\ndev tun\nproto %s\nremote %s %d\nresolv-retry infinite\nnobind\npersist-key\npersist-tun\nremote-cert-tls server\nauth-nocache\npull-filter ignore \"redirect-gateway\"\nverb %d\n",
+        proto, host, port, verb), nil
+}
 func buildProfileHeader(settings ProfileSettings, host, protocol string) (string, error) {
     if err := validateProfileTemplate(settings.Template); err != nil { return "", err }
     if settings.ExternalPort < 1 || settings.ExternalPort > 65535 { return "", fmt.Errorf("invalid external port") }
