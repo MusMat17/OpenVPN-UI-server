@@ -1,4 +1,4 @@
-bin/
+# Builds and private server data
 *.ovpn
 *.key
 *.pem
@@ -8,5 +8,8 @@ disabled.list
 config.json
 management.pass
 .env
+.DS_Store
+*.test
+*.out
 __pycache__/
 *.pyc

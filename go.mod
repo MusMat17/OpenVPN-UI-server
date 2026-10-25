@@ -1,3 +1,3 @@
-module github.com/MusMat17/OpenVPN-UI-server
+module github.com/openvpn-control/openvpn-control
 
 go 1.23
