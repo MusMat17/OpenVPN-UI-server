@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # OpenVPN Control public bootstrap for clean Debian 13 (amd64).
-# Usage: bash <(wget -qO- https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-server/main/quick-install.sh)
+# Usage: bash <(wget -qO- https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-server/feature/openvpn-control-hyperos4/quick-install.sh)
 set -Eeuo pipefail
 umask 077
 if [[ $(id -u) -ne 0 ]]; then
@@ -18,7 +18,7 @@ done
 }
 TMP_DIR=$(mktemp -d /tmp/openvpn-control.XXXXXXXX)
 trap 'rm -rf "$TMP_DIR"' EXIT
-ARCHIVE_URL='https://github.com/MusMat17/OpenVPN-UI-server/archive/refs/heads/main.tar.gz'
+ARCHIVE_URL='https://github.com/MusMat17/OpenVPN-UI-server/archive/refs/heads/feature/openvpn-control-hyperos4.tar.gz'
 echo 'Downloading OpenVPN Control from GitHub...'
 wget -q --https-only --timeout=30 --tries=3 -O "$TMP_DIR/source.tar.gz" "$ARCHIVE_URL" || {
   echo 'ERROR: Cannot download GitHub archive (check DNS/internet).' >&2
