@@ -10,7 +10,7 @@ wget -O /tmp/update-ui.sh https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-
 
 The update script downloads the current published Linux AMD64 binary, verifies its SHA-256 against the release checksum, backs up the previous panel binary and restarts **only** `openvpn-control.service`. If that service fails to restart, the script attempts to restore the previous executable.
 
-The panel remains available at **https://YOUR_LAN_SERVER_IP:8989** (for example, `https://192.168.40.10:8989`).
+The panel remains available at **https://YOUR_LAN_SERVER_IP:8989** 
 
 The release is automatically rebuilt from `main` after UI changes. Re-run this same command to apply a later published update.
 
