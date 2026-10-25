@@ -63,6 +63,10 @@ type Client struct {
 	Disabled  bool      `json:"disabled"`
 	Deleted   bool      `json:"deleted"`
 	Revoked   bool      `json:"revoked"`
+    ExternalHost string `json:"external_host,omitempty"`
+    ExternalPort int `json:"external_port,omitempty"`
+    Verb int `json:"verb"`
+    ProfileConfigured bool `json:"profile_configured,omitempty"`
 }
 type App struct {
 	mu       sync.Mutex
