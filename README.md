@@ -25,10 +25,10 @@
 Откройте root-сессию (`su -`) и выполните:
 
 ```bash
-bash <(wget -qO- https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-server/main/quick-install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-server/feature/openvpn-control-hyperos4/quick-install.sh)
 ```
 
-Загрузчик скачает публичный код и проверенную SHA-256 готовую сборку из ветки `main`, затем запустит мастер выбора протокола **UDP/TCP**, VPN-порта, адреса сервера, LAN/VPN подсетей и пароля администратора. Панель после установки: `https://IP_СЕРВЕРА:8989`.
+Загрузчик скачает публичный код и проверенную SHA-256 готовую сборку из ветки `feature/openvpn-control-hyperos4`, затем запустит мастер выбора протокола **UDP/TCP**, VPN-порта, адреса сервера, LAN/VPN подсетей и пароля администратора. Панель после установки: `https://IP_СЕРВЕРА:8989`.
 
 Перед выполнением можете посмотреть исходник: [quick-install.sh](quick-install.sh). Не используйте автоматическую установку на работающем VPN-сервере; проверьте скрипт и снимите checkpoint VM.
 
