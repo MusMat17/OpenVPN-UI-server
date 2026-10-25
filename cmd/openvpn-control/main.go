@@ -18,6 +18,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,6 +68,7 @@ type App struct {
 	cfg      Config
 	clients  map[string]Client
 	sessions map[string]Session
+	loginTokens map[string]time.Time
 	tries    map[string]Attempt
 	t        *template.Template
 }
@@ -129,7 +131,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := &App{cfg: cfg, t: t, clients: map[string]Client{}, sessions: map[string]Session{}, tries: map[string]Attempt{}}
+	a := &App{cfg: cfg, t: t, clients: map[string]Client{}, sessions: map[string]Session{}, loginTokens: map[string]time.Time{}, tries: map[string]Attempt{}}
 	if err := a.load(); err != nil {
 		log.Fatal(err)
 	}
@@ -230,15 +232,56 @@ func checkPassword(password, hash string) bool {
 	got := pbkdf2(password, salt, iter)
 	return subtle.ConstantTimeCompare(got, want) == 1
 }
+// A login form uses a single-use server-side CSRF nonce. No pre-login cookie is
+// required, so privacy policies and self-signed certificates cannot break login.
+const loginTokenTTL = 15 * time.Minute
+const maxLoginTokens = 2048
+
 func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
-	csrf := randomString(24)
-	http.SetCookie(w, &http.Cookie{Name: "login_csrf", Value: csrf, Path: "/login", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: 1800})
-	a.t.ExecuteTemplate(w, "login.html", struct {
-		CSRF  string
-		Error bool
-		CSRFError bool
-	}{csrf, r.URL.Query().Get("error") == "1", r.URL.Query().Get("error") == "csrf"})
+    csrf := randomString(32)
+    a.mu.Lock()
+    if a.loginTokens == nil { a.loginTokens = make(map[string]time.Time) }
+    now := time.Now()
+    for token, expiry := range a.loginTokens {
+        if now.After(expiry) { delete(a.loginTokens, token) }
+    }
+    // Bound memory even under a login-page flood; tokens are intentionally ephemeral.
+    if len(a.loginTokens) >= maxLoginTokens {
+        for token := range a.loginTokens {
+            delete(a.loginTokens, token)
+            break
+        }
+    }
+    a.loginTokens[csrf] = now.Add(loginTokenTTL)
+    a.mu.Unlock()
+    w.Header().Set("Cache-Control", "no-store")
+    a.t.ExecuteTemplate(w, "login.html", struct {
+        CSRF string
+        Error bool
+        CSRFError bool
+    }{csrf, r.URL.Query().Get("error") == "1", r.URL.Query().Get("error") == "csrf"})
 }
+
+func (a *App) consumeLoginToken(token string) bool {
+    if len(token) < 32 || len(token) > 128 { return false }
+    a.mu.Lock()
+    defer a.mu.Unlock()
+    deadline, ok := a.loginTokens[token]
+    delete(a.loginTokens, token)
+    return ok && time.Now().Before(deadline)
+}
+
+// POST /login must come from this same HTTPS origin. A one-time form token alone
+// does not bind a request to a browser, so require Origin or Fetch Metadata too.
+func sameOriginLogin(r *http.Request) bool {
+    origin := r.Header.Get("Origin")
+    if origin != "" {
+        u, err := url.Parse(origin)
+        return err == nil && u.Scheme == "https" && u.Host == r.Host && u.Path == "" && u.RawQuery == "" && u.Fragment == ""
+    }
+    return r.Header.Get("Sec-Fetch-Site") == "same-origin"
+}
+
 func ipOf(r *http.Request) string {
 	ip, _, e := net.SplitHostPort(r.RemoteAddr)
 	if e != nil {
@@ -260,12 +303,11 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad request", 400)
 		return
 	}
-	c, err := r.Cookie("login_csrf")
-	if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(r.FormValue("csrf"))) != 1 {
-		// Reject a stale/blocked login cookie while allowing a fresh login attempt.
-		http.Redirect(w, r, "/login?error=csrf", http.StatusSeeOther)
-		return
-	}
+	if !sameOriginLogin(r) || !a.consumeLoginToken(r.FormValue("csrf")) {
+        // Fresh GET /login issues a new nonce. Invalid tokens cannot authenticate.
+        http.Redirect(w, r, "/login?error=csrf", http.StatusSeeOther)
+        return
+    }
 	valid := r.FormValue("user") == "admin" && checkPassword(r.FormValue("password"), a.cfg.AdminHash)
 	a.mu.Lock()
 	defer a.mu.Unlock()
