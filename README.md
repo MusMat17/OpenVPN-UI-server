@@ -1,9 +1,100 @@
-# OpenVPN UI Server
+# OpenVPN Control
 
-Open-source OpenVPN server installer and lightweight web admin panel for Debian 13.
+Лёгкий OpenVPN 2.6 + HTTPS-панель в современной визуальной стилистике Xiaomi HyperOS (вдохновение, без копирования логотипов и фирменных компонентов).
 
-Development is ongoing in the [`feature/openvpn-control-hyperos4`](../../tree/feature/openvpn-control-hyperos4) branch. This is experimental software: do not deploy to a production VPN server before testing.
+**Целевая ОС:** чистая Debian 13 (amd64), виртуальная машина Hyper-V. **Не запускайте поверх существующей установки OpenVPN.**
 
-The installer will let administrators choose UDP or TCP, the VPN port, and will provide an HTTPS admin interface on TCP port 8989. It is designed for split tunneling, certificate expiry selection, per-client notes, revocation and temporary blocking.
+## Возможности
 
-The web interface is HyperOS-inspired and is not affiliated with Xiaomi.
+- Интерактивная установка: **TCP или UDP** и произвольный **порт OpenVPN 1–65535**.
+- Веб-панель: **HTTPS `192.168.40.10:8989`** (адрес сервера можно выбрать).
+- Split Tunnel: через VPN только `192.168.40.0/24`, интернет клиентов напрямую через их провайдера. NAT ограничен локальной сетью.
+- Создание клиентских X.509-сертификатов с настраиваемым сроком действия в днях (1–3650).
+- Комментарий к сертификату с возможностью последующего редактирования.
+- Скачивание готового `.ovpn` с `tls-crypt`, без `tls-auth` и без `redirect-gateway`.
+- Временное **отключение** клиента (запрет следующих подключений и попытка разорвать текущую сессию); **включение** обратно.
+- **Удаление** клиента с отзывом сертификата, обновлением CRL и удалением приватного ключа на сервере. Это необратимо.
+- Список клиентов, статус подключений из OpenVPN status-файла, журнал действий.
+- TLS, серверные HTTP-сессии, CSRF-защита, ограничение попыток входа, защищённые cookies, PBKDF2-SHA256 для пароля.
+- Один бинарник Go без Docker, JS-фреймворков, внешних CSS/JS CDN и постоянно работающей БД.
+
+## Установка
+
+**Только на новой Debian 13**, где **ещё нет** `/etc/openvpn/server/server.conf`. Снимите контрольную точку ВМ перед установкой. Сервер должен иметь статический IP (например, `192.168.40.10`).
+
+Скачайте архив дистрибутива на Debian и выполните:
+
+```bash
+tar xzf openvpn-control-debian13-amd64.tar.gz
+cd openvpn-control
+su -
+cd /path/to/openvpn-control
+bash install.sh
+```
+
+Можно запускать из root SSH-терминала с интерактивным TTY. Скрипт спросит:
+
+| Настройка | Пример |
+|---|---|
+| IP сервера на LAN | `192.168.40.10` |
+| LAN, доступная VPN-клиентам | `192.168.40.0/24` |
+| VPN-сеть | `10.8.0.0/24` |
+| Протокол OpenVPN | `udp` или `tcp` |
+| Порт OpenVPN | `1194`, `443` или другой |
+| Внешний IP/DDNS | `vpn.example.org` |
+| Пароль администратора | не менее 12 символов |
+
+До подтверждения установщик не меняет систему. Выбранные параметры применяются к серверному конфигу, firewall и `.ovpn` файлам. Установщик не изменяет IP Debian и не настраивает домашний маршрутизатор автоматически.
+
+После установки: **https://192.168.40.10:8989** (если IP задан как выше), пользователь `admin` и введённый пароль. HTTPS использует самоподписанный сертификат; проверьте отпечаток:
+
+```bash
+openssl x509 -in /etc/openvpn-control/tls/server.crt -noout -fingerprint -sha256
+```
+
+Панель слушает только выбранный LAN IP, а nftables разрешает TCP 8989 лишь из LAN и VPN. **Не пробрасывайте 8989** с маршрутизатора. Пробросьте **только выбранный порт OpenVPN и соответствующий TCP/UDP протокол** на LAN IP сервера.
+
+## Устройство и безопасность
+
+- `/etc/openvpn/server/server.conf` — OpenVPN, один маршрут `push "route 192.168.40.0 255.255.255.0"`.
+- `/etc/openvpn-control/firewall.nft` — разрешённый VPN forward только в LAN, scoped masquerade в LAN; административный веб-порт ограничен LAN/VPN.
+- `/etc/openvpn-control/easy-rsa/pki` — свой CA, серверные и клиентские сертификаты, CRL. **Секретный ключ CA хранится на сервере**, чтобы панель могла выдавать сертификаты, доступ root-only.
+- `/etc/openvpn/server/ta.key` — общий TLS-Crypt ключ.
+- `/var/lib/openvpn-control/clients.json` — клиентские комментарии и статусы (root-only).
+- `/var/lib/openvpn-control/disabled.list` — список временно заблокированных CN; скрипт `client-connect` отклоняет их новые подключения.
+- `/var/lib/openvpn-control/audit.log` — журнал админ-действий.
+- `/etc/openvpn-control/config.json` — параметры веб-приложения и хеш пароля (root-only).
+- `/etc/openvpn-control/management.pass` — пароль управления OpenVPN (root-only).
+- `openvpn-control.service`, `openvpn-control-firewall.service`, `openvpn-server@server.service` — systemd службы.
+
+**Важно:** отзыв сертификата действует для новых подключений после обновления CRL; текущая сессия отключается через management API по возможности. При недоступности management API временно отключённый клиент может оставаться подключённым до реконнекта — проверьте Dashboard.
+
+VPN-клиент может обращаться к LAN (например, `192.168.40.1`) и к панели на LAN IP сервера. Клиентские сети, совпадающие с целевой `192.168.40.0/24`, требуют отдельного решения конфликта маршрутов. В профили **не добавляются** публичный DNS и `redirect-gateway`. Контроль локальной Windows-брандмауэр/маршрутизации на конечных хостах необходим.
+
+**Не применяйте проект на критическом production-сервере без стендовой проверки и аудита безопасности.** Это первая реализация, предназначенная для испытаний на новой ВМ.
+
+## Операции
+
+```bash
+systemctl status openvpn-server@server openvpn-control --no-pager
+journalctl -u openvpn-control -n 50 --no-pager
+nft list table ip openvpn_control
+ip -4 addr show tun0
+```
+
+Смена протокола/порта после установки требует одновременного обновления серверной конфигурации, параметров панели и проброса на маршрутизаторе; установленный протокол и порт **выбираются вручную при первичной установке**.
+
+## Разработка и тесты
+
+```bash
+go test ./...
+go vet ./...
+bash -n install.sh
+./build.sh
+```
+
+`./build.sh` создаёт статически собранный `bin/openvpn-control-linux-amd64`. Go нужен только при сборке, не на Debian. GitHub Actions запускает тесты и публикует собранный бинарник как workflow artifact.
+
+## Бэкап
+
+Сохраните в защищённом хранилище `/etc/openvpn-control`, `/etc/openvpn/server` и `/var/lib/openvpn-control`. Не публикуйте эти директории в GitHub; в особенности `pki/private/`, `management.pass`, `config.json` и личные `.ovpn`.
