@@ -680,6 +680,13 @@ func (a *App) createClient(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	comment := strings.TrimSpace(r.FormValue("comment"))
 	days, e := strconv.Atoi(r.FormValue("days"))
+    host := strings.TrimSpace(r.FormValue("external_host"))
+    publicPort, portErr := strconv.Atoi(r.FormValue("external_port"))
+    verb, verbErr := strconv.Atoi(r.FormValue("verb"))
+    if portErr != nil || verbErr != nil || !validProfileInputs(host, publicPort, verb) {
+        http.Error(w, "invalid external IP/DNS, port or verb", http.StatusBadRequest)
+        return
+    }
 	if !validName(name) || e != nil || days < 1 || days > 3650 || len([]rune(comment)) > 256 {
 		http.Error(w, "invalid client name, days or comment", 400)
 		return
@@ -709,15 +716,25 @@ func (a *App) createClient(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	cert := Client{Name: name, Comment: comment, Days: days, CreatedAt: now, ExpiresAt: expiry}
+	cert := Client{Name: name, Comment: comment, Days: days, CreatedAt: now, ExpiresAt: expiry, ExternalHost: host, ExternalPort: publicPort, Verb: verb, ProfileConfigured: true}
 	a.clients[name] = cert
 	if e := a.save(); e != nil {
 		log.Printf("save failed: %v", e)
 		http.Error(w, "metadata save failure", 500)
 		return
 	}
-	audit("create", name)
-	http.Redirect(w, r, "/?msg=created", 303)
+	// Remember connection fields as defaults for the next client creation.
+    a.profile.ExternalHost = host
+    a.profile.ExternalPort = publicPort
+    a.profile.Verb = verb
+    a.profile.Template = "" // Remove legacy editable templates: server controls all other directives.
+    if b, e := json.MarshalIndent(a.profile, "", "  "); e == nil {
+        if e := atomicWrite(filepath.Join(statePath, profileSettingsFile), b, 0600); e != nil {
+            log.Printf("profile defaults not saved: %v", e)
+        }
+    }
+    audit("create", name)
+    http.Redirect(w, r, "/?msg=created#clients", 303)
 }
 func (a *App) disableClient(w http.ResponseWriter, r *http.Request) { a.toggle(w, r, true) }
 func (a *App) enableClient(w http.ResponseWriter, r *http.Request)  { a.toggle(w, r, false) }
