@@ -18,3 +18,20 @@
 .profile-help{background:#f5f8ff;border-radius:13px;padding:13px 15px;font-size:11px;color:#717f98;line-height:1.8}
 .profile-form>.form-footer{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap}
 @media(max-width:720px){.profile-port-grid{grid-template-columns:minmax(0,1fr)}.profile-editor{font-size:11px;min-height:300px;padding:14px}.profile-form>.form-footer{align-items:stretch;flex-direction:column}}
+
+/* Keep Settings, Client and Add links accessible on narrow screens. */
+@media (min-width:721px) and (max-width:1150px) {
+  .sidebar nav a,.sidebar nav a:not(.nav-active) {
+    display:flex!important;justify-content:center;align-items:center;
+    font-size:0!important;padding:13px!important;
+  }
+  .sidebar nav a .nav-symbol {font-size:22px!important}
+}
+@media (max-width:720px) {
+  .sidebar nav{display:flex;gap:4px;overflow-x:auto;max-width:calc(100vw - 165px)}
+  .sidebar nav a,.sidebar nav a:not(.nav-active) {
+    display:flex!important;align-items:center;justify-content:center;
+    flex:0 0 auto;font-size:0!important;padding:9px 11px!important
+  }
+  .sidebar nav a .nav-symbol{font-size:19px!important}
+}
