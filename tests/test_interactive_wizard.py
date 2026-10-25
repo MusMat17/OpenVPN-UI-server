@@ -35,7 +35,7 @@ class WizardTests(unittest.TestCase):
                 '',                  # server IP: default
                 '',                  # LAN: default
                 '192.168.40.0/24',   # invalid overlapping VPN net
-                '',                  # VPN net: default
+                '10.40.0.0/24',      # valid custom subnet regression
                 'wrong',             # invalid protocol
                 '  TCP  ',           # trim whitespace and allow uppercase
                 '99999',             # invalid port
@@ -59,6 +59,7 @@ class WizardTests(unittest.TestCase):
             )
             self.assertEqual(completed.returncode, 0, completed.stdout)
             self.assertIn('RESULT=tcp/443', completed.stdout)
+            self.assertIn('VPN 10.40.0.0/24', completed.stdout)
             self.assertGreaterEqual(completed.stdout.count('Invalid value:'), 6)
 
 
