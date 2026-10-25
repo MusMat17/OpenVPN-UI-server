@@ -30,10 +30,19 @@ try: ipaddress.IPv4Address(sys.argv[1])
 except ValueError: sys.exit(1)
 PY
 }
-valid_net(){ python3 - "$1" <<'PY'
-import ipaddress,sys
-try: ipaddress.IPv4Network(sys.argv[1],strict=True)
-except ValueError: sys.exit(1)
+valid_net(){
+  python3 - "$1" <<'PY'
+import ipaddress
+import sys
+value = sys.argv[1].strip()
+try:
+    network = ipaddress.IPv4Network(value, strict=True)
+    if network.prefixlen < 1 or network.prefixlen > 30:
+        raise ValueError("VPN/LAN network prefix must be between /1 and /30")
+except ValueError as exc:
+    print(f"Invalid network {value!r}: {exc}", file=sys.stderr)
+    sys.exit(1)
+sys.exit(0)
 PY
 }
 valid_host(){ [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$ ]]; }
