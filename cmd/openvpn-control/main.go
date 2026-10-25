@@ -232,11 +232,12 @@ func checkPassword(password, hash string) bool {
 }
 func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
 	csrf := randomString(24)
-	http.SetCookie(w, &http.Cookie{Name: "login_csrf", Value: csrf, Path: "/login", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode, MaxAge: 600})
+	http.SetCookie(w, &http.Cookie{Name: "login_csrf", Value: csrf, Path: "/login", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: 1800})
 	a.t.ExecuteTemplate(w, "login.html", struct {
 		CSRF  string
 		Error bool
-	}{csrf, r.URL.Query().Get("error") != ""})
+		CSRFError bool
+	}{csrf, r.URL.Query().Get("error") == "1", r.URL.Query().Get("error") == "csrf"})
 }
 func ipOf(r *http.Request) string {
 	ip, _, e := net.SplitHostPort(r.RemoteAddr)
@@ -261,7 +262,8 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := r.Cookie("login_csrf")
 	if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(r.FormValue("csrf"))) != 1 {
-		http.Error(w, "CSRF mismatch", 403)
+		// Reject a stale/blocked login cookie while allowing a fresh login attempt.
+		http.Redirect(w, r, "/login?error=csrf", http.StatusSeeOther)
 		return
 	}
 	valid := r.FormValue("user") == "admin" && checkPassword(r.FormValue("password"), a.cfg.AdminHash)
