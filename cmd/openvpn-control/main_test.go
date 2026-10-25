@@ -83,7 +83,7 @@ func TestLoginCSRFRejectsCrossOriginAndExpiredToken(t *testing.T) {
     csrf := randomString(32)
     a.loginTokens[csrf] = time.Now().Add(10 * time.Minute)
     form := url.Values{"csrf": {csrf}, "user": {"admin"}, "password": {"test-correct-password"}}
-    for _, origin := range []string{"https://evil.example", "http://192.168.40.10:8989", ""} {
+    for _, origin := range []string{"https://evil.example", "http://192.168.40.10:8989"} {
         req := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
         req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
         if origin != "" { req.Header.Set("Origin", origin) }
@@ -94,4 +94,35 @@ func TestLoginCSRFRejectsCrossOriginAndExpiredToken(t *testing.T) {
     expired := randomString(32)
     a.loginTokens[expired] = time.Now().Add(-1 * time.Second)
     if a.consumeLoginToken(expired) { t.Fatal("expired token accepted") }
+}
+
+func TestLoginCSRFWorksWithoutOriginAndFetchMetadata(t *testing.T) {
+    a := &App{cfg: Config{AdminHash: hashPassword("test-correct-password")},
+        sessions: make(map[string]Session), tries: make(map[string]Attempt), loginTokens: map[string]time.Time{}}
+    csrf := randomString(32)
+    a.loginTokens[csrf] = time.Now().Add(10 * time.Minute)
+    form := url.Values{"csrf": {csrf}, "user": {"admin"}, "password": {"test-correct-password"}}
+    request := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+    request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+    response := httptest.NewRecorder()
+    a.login(response, request)
+    if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/" {
+        t.Fatalf("valid no-origin browser submission failed: %d %s", response.Code, response.Header().Get("Location"))
+    }
+}
+func TestLoginCSRFRejectsExplicitCrossSiteFetchMetadata(t *testing.T) {
+    a := &App{cfg: Config{AdminHash: hashPassword("test-correct-password")},
+        sessions: make(map[string]Session), tries: make(map[string]Attempt), loginTokens: map[string]time.Time{}}
+    csrf := randomString(32)
+    a.loginTokens[csrf] = time.Now().Add(10 * time.Minute)
+    form := url.Values{"csrf": {csrf}, "user": {"admin"}, "password": {"test-correct-password"}}
+    request := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+    request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+    request.Header.Set("Sec-Fetch-Site", "cross-site")
+    response := httptest.NewRecorder()
+    a.login(response, request)
+    if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/login?error=csrf" {
+        t.Fatal("explicit cross-site metadata bypassed CSRF")
+    }
+    if !a.consumeLoginToken(csrf) { t.Fatal("wrongly consumed token on blocked origin") }
 }
