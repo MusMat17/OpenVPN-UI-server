@@ -147,7 +147,7 @@ func validateProfileTemplate(t string) error {
     return nil
 }
 
-var externalHostRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.-]{0,252}package main
+var externalHostRE = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}package main
 
 import (
 	"crypto/hmac"
@@ -295,7 +295,6 @@ func validateProfileTemplate(t string) error {
     }
     return nil
 }
-
 )
 func validExternalHost(s string) bool {
     if !externalHostRE.MatchString(s) { return false }
