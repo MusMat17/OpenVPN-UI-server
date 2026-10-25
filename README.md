@@ -1,6 +1,8 @@
 # OpenVPN Control
 
-Лёгкий OpenVPN 2.6 + HTTPS-панель в стиле Bento Dashboard с адаптивной сеткой карточек и типографикой Inter / Inter Display (системные резервные шрифты при отсутствии Inter).
+**Lightweight OpenVPN server + HTTPS UI for Debian 13 with client management and split tunnel.**
+
+OpenVPN 2.6 и адаптивная HTTPS-панель Bento Dashboard (Inter / Inter Display). В обзоре только две карточки — **«Всего клиентов»** и **«Онлайн сейчас»**; далее список клиентов и форма создания сертификата.
 
 **Целевая ОС:** чистая Debian 13 (amd64), виртуальная машина Hyper-V. **Не запускайте поверх существующей установки OpenVPN.**
 
@@ -26,26 +28,16 @@
 Откройте root-сессию (`su -`) и выполните:
 
 ```bash
-bash <(wget -qO- https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-server/feature/openvpn-control-hyperos4/quick-install.sh)
+bash <(wget -qO- https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-server/main/quick-install.sh)
 ```
 
-Загрузчик скачает публичный код и проверенную SHA-256 готовую сборку из ветки `feature/openvpn-control-hyperos4`, затем запустит мастер выбора протокола **UDP/TCP**, VPN-порта, адреса сервера, LAN/VPN подсетей и пароля администратора. Панель после установки: `https://IP_СЕРВЕРА:8989`.
+Загрузчик скачает исходники из `main` и актуальный бинарник из [GitHub Releases](https://github.com/MusMat17/OpenVPN-UI-server/releases), проверит SHA-256, затем запустит мастер выбора протокола **UDP/TCP**, VPN-порта, адреса сервера, LAN/VPN подсетей и пароля администратора. Панель после установки: `https://IP_СЕРВЕРА:8989`.
 
 Перед выполнением можете посмотреть исходник: [quick-install.sh](quick-install.sh). Не используйте автоматическую установку на работающем VPN-сервере; проверьте скрипт и снимите checkpoint VM.
 
-## Установка
+## Параметры установки
 
-**Только на новой Debian 13**, где **ещё нет** `/etc/openvpn/server/server.conf`. Снимите контрольную точку ВМ перед установкой. Сервер должен иметь статический IP (например, `192.168.40.10`).
-
-Скачайте архив дистрибутива на Debian и выполните:
-
-```bash
-tar xzf openvpn-control-debian13-amd64.tar.gz
-cd openvpn-control
-su -
-cd /path/to/openvpn-control
-bash install.sh
-```
+**Только на новой Debian 13**, где **ещё нет** `/etc/openvpn/server/server.conf`. Перед установкой снимите контрольную точку ВМ. Сервер должен иметь статический IP (например, `192.168.40.10`).
 
 Можно запускать из root SSH-терминала с интерактивным TTY. Скрипт спросит:
 
@@ -69,6 +61,18 @@ openssl x509 -in /etc/openvpn-control/tls/server.crt -noout -fingerprint -sha256
 
 Панель слушает только выбранный LAN IP, а nftables разрешает TCP 8989 лишь из LAN и VPN. **Не пробрасывайте 8989** с маршрутизатора. Пробросьте **только выбранный порт OpenVPN и соответствующий TCP/UDP протокол** на LAN IP сервера.
 
+## Обновление только UI
+
+**Отдельная команда для существующей установки.** После будущих изменений интерфейса используется та же команда:
+
+```bash
+wget -O /tmp/update-ui.sh https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-server/main/update-ui.sh && bash /tmp/update-ui.sh
+```
+
+Скрипт не меняет OpenVPN, сертификаты и правила NAT: только бинарник веб-панели с резервной копией и проверкой контрольной суммы.
+
+**[Подробная инструкция по обновлению панели →](UPDATE-UI.md)**
+
 ## Настройки .ovpn в разделе «Новый клиент»
 
 Вместо отдельного текстового редактора используется форма **«Новый клиент» → «Параметры подключения»**. При создании сертификата можно изменить только `Внешний IP / DNS`, `Внешний порт` и `Verb` (0–11). Внизу блока отображается живой предпросмотр генерируемого `.ovpn`.
@@ -76,12 +80,6 @@ openssl x509 -in /etc/openvpn-control/tls/server.crt -noout -fingerprint -sha256
 Для схемы маршрутизатора **TCP/2253 → 192.168.40.10:1194** в форме следует указать внешний порт **2253**. OpenVPN по-прежнему принимает соединения на **TCP/1194** — изменять server.conf или NAT не требуется. Параметры `proto`, `dev`, `tls-crypt`, `remote-cert-tls`, Split Tunnel и сертификаты определяет сервер, а не пользовательский шаблон.
 
 Каждый новый сертификат сохраняет собственные настройки адреса, порта и `verb`; последующие изменения формы их не затрагивают. Ранее созданные сертификаты и ключи сохраняются. Старые профили, не содержащие индивидуальных параметров, используют мигрированные значения прежних настроек из `/var/lib/openvpn-control/profile-settings.json`.
-
-Чтобы обновить только веб-панель:
-
-```bash
-wget -O /tmp/update-ui.sh https://raw.githubusercontent.com/MusMat17/OpenVPN-UI-server/feature/openvpn-control-hyperos4/update-ui.sh && bash /tmp/update-ui.sh
-```
 
 ## Устройство и безопасность
 
@@ -123,7 +121,7 @@ bash -n install.sh
 ./build.sh
 ```
 
-`./build.sh` создаёт статически собранный `bin/openvpn-control-linux-amd64`. Go нужен только при сборке, не на Debian. GitHub Actions запускает тесты и публикует собранный бинарник как workflow artifact.
+`./build.sh` создаёт статически собранный `bin/openvpn-control-linux-amd64`. Go нужен только при сборке, не на Debian. GitHub Actions публикует сборку из ветки `main` в [GitHub Releases](https://github.com/MusMat17/OpenVPN-UI-server/releases), откуда её получают установщик и скрипт обновления UI.
 
 ## Бэкап
 
