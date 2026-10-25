@@ -1,4 +1,6 @@
-# OpenVPN Control
+# OpenVPN Control · OpenVPN UI Server
+
+> **ALPHA / experimental.** For a fresh Debian 13 test VM only. The clean-VM integration/security audit is not finished. Do not run over an existing OpenVPN installation. This community project is not affiliated with Xiaomi or OpenVPN Inc.
 
 Лёгкий OpenVPN 2.6 + HTTPS-панель в современной визуальной стилистике Xiaomi HyperOS (вдохновение, без копирования логотипов и фирменных компонентов).
 
@@ -18,41 +20,28 @@
 - TLS, серверные HTTP-сессии, CSRF-защита, ограничение попыток входа, защищённые cookies, PBKDF2-SHA256 для пароля.
 - Один бинарник Go без Docker, JS-фреймворков, внешних CSS/JS CDN и постоянно работающей БД.
 
-## Установка
+## Установка с GitHub на чистую Debian 13
 
-**Только на новой Debian 13**, где **ещё нет** `/etc/openvpn/server/server.conf`. Снимите контрольную точку ВМ перед установкой. Сервер должен иметь статический IP (например, `192.168.40.10`).
-
-Скачайте архив дистрибутива на Debian и выполните:
+Протестируйте сначала на новой виртуальной машине со снимком. На сервере необходимо заранее настроить статический IPv4, установить git и обеспечить интернет-доступ. Панель использует **HTTPS TCP 8989**, который **нельзя пробрасывать в интернет**.
 
 ```bash
-tar xzf openvpn-control-debian13-amd64.tar.gz
-cd openvpn-control
-su -
-cd /path/to/openvpn-control
+apt-get update && apt-get install -y git
+git clone --branch feature/openvpn-control-hyperos4 https://github.com/MusMat17/OpenVPN-UI-server.git
+cd OpenVPN-UI-server
 bash install.sh
 ```
 
-Можно запускать из root SSH-терминала с интерактивным TTY. Скрипт спросит:
+Установщик спросит LAN IP, целевую сеть, VPN-сеть, **TCP или UDP**, VPN-порт (1–65535), внешний адрес сервера и пароль администратора. После подтверждения установит OpenVPN с маршрутом только в выбранную LAN, без перенаправления интернета клиентов.
 
-| Настройка | Пример |
-|---|---|
-| IP сервера на LAN | `192.168.40.10` |
-| LAN, доступная VPN-клиентам | `192.168.40.0/24` |
-| VPN-сеть | `10.8.0.0/24` |
-| Протокол OpenVPN | `udp` или `tcp` |
-| Порт OpenVPN | `1194`, `443` или другой |
-| Внешний IP/DDNS | `vpn.example.org` |
-| Пароль администратора | не менее 12 символов |
+При отсутствии локального бинарника скрипт скачает `v0.1.0-alpha` и `SHA256SUMS` из **GitHub Releases**, проверит контрольную сумму и только затем установит бинарник. До публикации успешного pre-release запуск установки не поддерживается. На Debian не требуется Go.
 
-До подтверждения установщик не меняет систему. Выбранные параметры применяются к серверному конфигу, firewall и `.ovpn` файлам. Установщик не изменяет IP Debian и не настраивает домашний маршрутизатор автоматически.
-
-После установки: **https://192.168.40.10:8989** (если IP задан как выше), пользователь `admin` и введённый пароль. HTTPS использует самоподписанный сертификат; проверьте отпечаток:
+После установки: **https://LAN_IP:8989**, логин `admin`, пароль — из установщика. HTTPS-сертификат самоподписан, проверьте отпечаток:
 
 ```bash
 openssl x509 -in /etc/openvpn-control/tls/server.crt -noout -fingerprint -sha256
 ```
 
-Панель слушает только выбранный LAN IP, а nftables разрешает TCP 8989 лишь из LAN и VPN. **Не пробрасывайте 8989** с маршрутизатора. Пробросьте **только выбранный порт OpenVPN и соответствующий TCP/UDP протокол** на LAN IP сервера.
+На пограничном маршрутизаторе пробросьте **только выбранный порт TCP/UDP OpenVPN**, не 8989.
 
 ## Устройство и безопасность
 
@@ -93,8 +82,11 @@ bash -n install.sh
 ./build.sh
 ```
 
-`./build.sh` создаёт статически собранный `bin/openvpn-control-linux-amd64`. Go нужен только при сборке, не на Debian. GitHub Actions запускает тесты и публикует собранный бинарник как workflow artifact.
+`./build.sh` создаёт статически собранный `bin/openvpn-control-linux-amd64`. Go нужен только при сборке, не на Debian. GitHub Actions запускает тесты и собирает Linux AMD64. Отдельный workflow публикует тестовый pre-release и SHA256SUMS после успешной сборки.
 
 ## Бэкап
 
 Сохраните в защищённом хранилище `/etc/openvpn-control`, `/etc/openvpn/server` и `/var/lib/openvpn-control`. Не публикуйте эти директории в GitHub; в особенности `pki/private/`, `management.pass`, `config.json` и личные `.ovpn`.
+## Лицензия и участие сообщества
+
+MIT License. Issues и Pull Requests приветствуются. Код ветки `feature/openvpn-control-hyperos4` общедоступен, поскольку сам репозиторий публичный.
