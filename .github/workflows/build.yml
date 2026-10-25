@@ -19,7 +19,7 @@ jobs:
       - name: Validate installer
         run: bash -n install.sh && bash -n build.sh
       - name: Build static AMD64 binary
-        run: ./build.sh
+        run: bash build.sh
       - uses: actions/upload-artifact@v4
         with:
           name: openvpn-control-linux-amd64
