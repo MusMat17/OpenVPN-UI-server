@@ -35,3 +35,103 @@
   }
   .sidebar nav a .nav-symbol{font-size:19px!important}
 }
+
+/* Bento 2026 — self-hosted UI with system font fallbacks; inspired by editorial SaaS dashboards. */
+.bento-ui{font-family:Inter,"Inter Display","Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important;background:#f4f4f2!important;color:#252532!important;margin:0;min-height:100vh}
+.bento-ui *{box-sizing:border-box}
+.bento-ui button,.bento-ui input,.bento-ui select{font:inherit}
+.bento-ui button{cursor:pointer}
+.bento-ui a{text-decoration:none}
+.bento-app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;max-width:1900px;margin:0 auto}
+.bento-side{position:sticky;top:0;max-height:100vh;min-height:100vh;display:flex;flex-direction:column;background:#fafaf8;border-right:1px solid #e8e8e7;padding:36px 20px 27px;z-index:10}
+.bento-ui .brand{display:flex;align-items:center;gap:12px;color:#292b37;font-weight:850;font-size:17px;letter-spacing:-.8px;margin:0 5px 60px}
+.brand-icon{display:grid;place-items:center;flex-shrink:0;width:36px;height:36px;border-radius:13px;background:#262731;color:#fff;font-size:26px}
+.brand-sub{display:block;font-size:10px;color:#a0a0aa;font-weight:600;letter-spacing:1.2px;padding-top:3px}
+.nav-caption{color:#a6a7b0;font-size:10px;letter-spacing:2px;font-weight:750;margin:0 18px 16px}
+.bento-nav{display:flex;flex-direction:column;gap:6px}
+.bento-nav a{display:flex;align-items:center;gap:14px;border-radius:14px;color:#858590;font-size:12px;font-weight:730;padding:15px 18px;transition:background .15s,color .15s}
+.bento-nav a span{font-size:21px}
+.bento-nav a:hover{background:#ededed;color:#414155}
+.bento-nav a.selected{background:#e9e7fa;color:#6b58cc}
+.side-status{display:flex;align-items:center;gap:12px;margin-top:auto;background:#f1f1ee;padding:16px;border-radius:15px}
+.side-status strong{font-size:12px;color:#444552}.side-status small{font-size:10px;color:#a0a0a9;display:block;margin-top:4px}
+.pulse-dot,.server-led{width:9px;height:9px;display:inline-block;border-radius:50%;background:#64c799;box-shadow:0 0 0 5px #d7f1e4;flex-shrink:0}
+.bento-main{padding:43px clamp(20px,4vw,72px) 35px;min-width:0}
+.bento-top{display:flex;align-items:flex-start;justify-content:space-between;gap:25px;margin-bottom:32px}
+.bento-top h1{font-weight:850;font-size:clamp(32px,3vw,47px);letter-spacing:-2.5px;line-height:1.15;margin:10px 0}
+.bento-top p,.section-head p{font-size:12px;color:#9a9aa4;margin:0;line-height:1.7}
+.bento-ui .subheading{font-size:10px;letter-spacing:2.2px;color:#a0a1ad;font-weight:800}
+.title-dot,.tiny-purple{color:#a899ef}
+.header-tools{display:flex;align-items:center;gap:12px;white-space:nowrap}
+.secure-indicator{padding:10px 13px;border-radius:12px;color:#469b78;background:#e8f4ed;font-size:10px;font-weight:750}
+.bento-ui .soft-btn{background:#fff;border:1px solid #ececef;color:#5c6072;border-radius:12px;padding:12px 16px;font-size:11px;font-weight:750}
+.bento-toast{background:#e5f6ef;color:#248d64;border-radius:12px;padding:14px 20px;margin:16px 0;font-size:12px;font-weight:700}
+.bento-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:26px}
+.bento-ui .b-card{border:1px solid #ededee;border-radius:24px;background:#fff;box-shadow:0 13px 33px #302f4210;min-width:0;position:relative;overflow:hidden}
+.hero-card{grid-column:span 2;grid-row:span 2;min-height:318px!important;background:#292838!important;color:#fff;display:flex;flex-direction:column;justify-content:space-between;padding:27px!important}
+.card-upper,.card-topline{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.eyebrow-dark{font-size:10px;color:#b0accc;font-weight:800;letter-spacing:2px}
+.round-mini{background:#454457;border-radius:50%;height:30px;width:30px;display:grid;place-items:center}
+.hero-art{height:123px;position:relative;display:grid;place-items:center}
+.hero-art .ring{position:absolute;border:1px solid #8e83b566;border-radius:50%;width:156px;height:156px;transform:rotate(-25deg) scaleX(1.6)}
+.hero-art .ring-two{width:95px;height:95px;transform:rotate(30deg) scaleX(1.5)}
+.core-orb{width:86px;height:86px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 24% 22%,#dcd2ff,#988bc0 50%,#514868 90%);font-size:44px;color:#fff;box-shadow:0 0 55px #9d8bec55}
+.hero-heading{font-size:27px;font-weight:830;letter-spacing:-1px}
+.hero-lower p{max-width:320px;color:#bebcc8;font-size:11px;line-height:1.7;margin:12px 0 19px}
+.dark-tag{background:#494659;border-radius:50px;padding:8px 12px;color:#d6cfff;font-weight:700;font-size:10px}
+.light-stat,.peach-stat,.endpoint-card,.server-card,.lan-card{padding:24px!important;min-height:155px!important;display:flex;flex-direction:column;align-items:stretch}
+.card-topline{font-size:11px;color:#8f919d;font-weight:700}
+.card-glyph{font-size:19px;color:#a9a6b8}
+.metric{font-size:clamp(28px,3.2vw,49px);font-weight:860;letter-spacing:-2px;margin:17px 0 6px;white-space:nowrap}
+.metric small{color:#aaaaae;font-size:11px;font-weight:600;letter-spacing:0;margin-left:8px}
+.metric-caption{font-size:11px;color:#aaaab3;margin-top:auto;line-height:1.6}
+.meter-track{height:5px;background:#eeeefa;border-radius:12px;margin-top:17px}.meter-track span{height:100%;display:block;border-radius:12px;background:#a69bed}
+.peach-stat{background:#fff1ed!important}.peach-stat .card-glyph,.peach-stat .metric{color:#c87167}
+.tiny-sparks{position:absolute;right:20px;bottom:22px;font-size:20px;color:#eda99d}
+.endpoint-host{font-size:clamp(13px,1.65vw,23px);font-weight:850;letter-spacing:-.6px;overflow-wrap:anywhere;margin-top:24px}.endpoint-port{font-weight:850;font-size:30px;color:#8a77dd}
+.server-card{background:#eeeafc!important}.server-metric{font-weight:850;font-size:clamp(24px,2.5vw,38px);margin:27px 0 6px;white-space:nowrap}.server-metric span{color:#8877d5}
+.server-bottom{font-size:10px;color:#8780b0;display:flex;gap:10px;align-items:center;margin-top:17px}
+.lan-metric{font-weight:820;font-size:clamp(14px,1.8vw,23px);letter-spacing:-.6px;overflow-wrap:anywhere;margin:29px 0 9px}
+.lan-indicator{font-size:9px;font-weight:800;letter-spacing:1px;color:#b2a9d7;margin-top:15px}.lan-indicator span{float:right}
+.clients-section{padding:28px!important;margin-bottom:28px}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:23px}
+.section-head h2{font-weight:840;font-size:clamp(24px,2.5vw,34px);letter-spacing:-1.2px;margin:7px 0 8px}
+.bento-ui .bento-primary{border:0;border-radius:13px;background:#7467d3;color:#fff!important;padding:15px 20px;font-size:12px;font-weight:790;box-shadow:0 10px 20px #7467d331}
+.bento-ui .small-primary{font-size:11px;padding:12px 15px}
+.bento-table-wrap{width:100%;overflow-x:auto}
+.bento-table{border-collapse:collapse;width:100%;min-width:740px}
+.bento-table th{text-align:left;border-bottom:1px solid #f0f0f1;padding:14px 12px;font-size:9px;letter-spacing:1.2px;color:#adb0bb}
+.bento-table td{padding:15px 12px;border-bottom:1px solid #f4f4f4;font-size:11px;color:#545765;vertical-align:middle}
+.bento-table td strong{font-size:11px;color:#3d3e4b}
+.bento-table tbody tr:last-child td{border:0}
+.client-entry{display:flex;align-items:center;gap:10px}
+.client-monogram{width:34px;height:34px;display:grid;place-items:center;background:#eae6fa;color:#8c76d6;border-radius:11px;font-weight:800;text-transform:uppercase}
+.client-entry small,.muted-inline{display:block;color:#a6a6b1;font-size:10px;margin-top:4px}
+.bento-pill{background:#f3f3f5;color:#9b9ba7;padding:7px 10px;border-radius:50px;font-size:9px;font-weight:800;white-space:nowrap}
+.bento-pill.on{background:#e5f7ed;color:#3a9f70}.bento-pill.off{background:#fff0e7;color:#c98163}
+.inline-comment{display:flex;align-items:center;gap:4px}.inline-comment input{max-width:170px;min-width:80px;background:#f8f8fa;border:1px solid #ededf1;border-radius:9px;padding:8px 10px;font-size:10px;color:#555b6b}.inline-comment button{border:0;color:#7669cc;background:transparent}
+.bento-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}.bento-actions a,.bento-actions button{background:none;border:0;font-size:10px;color:#7868cb;font-weight:700;white-space:nowrap;padding:5px}.bento-actions .danger-action{color:#d87c87}
+.table-empty{padding:35px!important;text-align:center!important;color:#9495a3!important}.table-empty a{color:#7768d0}
+.bento-create{padding-bottom:28px}.create-heading{margin-bottom:22px}.create-spark{font-size:48px;color:#a89aea}
+.create-bento-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.form-card{padding:27px!important}.step-title{display:flex;align-items:center;gap:12px;margin-bottom:27px}
+.step-number{width:36px;height:36px;flex-shrink:0;background:#fce9dd;color:#c48264;border-radius:12px;display:grid;place-items:center;font-size:13px;font-weight:800}
+.purple-number{background:#ece9fe;color:#8875d3}
+.step-title h3,.preview-top h3{font-weight:830;letter-spacing:-.65px;font-size:19px;margin:0 0 6px}.step-title p{font-size:11px;color:#a9a9b1;margin:0}
+.form-stack{display:flex;flex-direction:column;gap:19px}
+.form-stack label{display:block;font-size:11px;font-weight:750;color:#666779}
+.form-stack input,.form-stack select{display:block;appearance:auto;width:100%;height:46px;margin-top:8px;background:#f7f7f8;border:1px solid #ebebef;border-radius:12px;padding:0 14px;color:#36374a;font-size:12px;outline:none}
+.form-stack input:focus,.form-stack select:focus{border-color:#9c8bec;box-shadow:0 0 0 3px #9c8bec23}.form-stack label small{font-size:10px;color:#b0b0b9;display:block;margin-top:6px}
+.form-dual{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.readonly-meta{background:#eeedfa;border-radius:13px;padding:15px;display:flex;flex-direction:column;gap:5px}
+.readonly-meta span,.readonly-meta small{font-size:10px;color:#9a95b5}.readonly-meta strong{font-size:13px;color:#7668bc}
+.connection-card{background:#faf9ff!important}
+.preview-card{grid-column:span 2;padding:27px!important}.preview-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}
+#profile-preview{background:#242532;color:#dad9ec;border-radius:17px;padding:24px;overflow:auto;white-space:pre-wrap;font:12px/1.65 "SFMono-Regular",Consolas,monospace;min-height:285px;margin:0}
+.preview-card>p{color:#a1a1b0;font-size:11px;margin:16px 0 0}
+.create-submit{grid-column:span 2;display:flex;justify-content:space-between;align-items:center;gap:15px}
+.create-submit>span{font-size:11px;color:#9c9eab;line-height:1.6}.create-submit button span{padding-left:18px}
+.bento-footer{display:flex;justify-content:space-between;gap:16px;color:#b0b0b9;font-size:9px;letter-spacing:1.2px;margin-top:25px}
+@media(max-width:1250px){.bento-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-card{grid-column:span 2;grid-row:span 1}.bento-app{grid-template-columns:205px minmax(0,1fr)}}
+@media(max-width:780px){.bento-app{display:block}.bento-side{position:relative;min-height:0;max-height:none;display:flex;flex-direction:row;align-items:center;padding:13px 18px;gap:14px}.bento-ui .brand{margin:0;font-size:14px}.nav-caption,.side-status{display:none}.bento-nav{display:flex;flex-direction:row;gap:2px;margin-left:auto}.bento-nav a{padding:9px;font-size:0}.bento-nav a span{font-size:21px}.bento-main{padding:28px 17px}.bento-top h1{font-size:34px}.header-tools .secure-indicator{display:none}.bento-stats{gap:12px}.bento-ui .b-card{border-radius:21px}.create-bento-grid{grid-template-columns:1fr}.preview-card,.create-submit{grid-column:span 1}}
+@media(max-width:470px){.bento-top{flex-direction:column;gap:14px}.header-tools{justify-content:flex-end;width:100%}.bento-stats{grid-template-columns:1fr 1fr}.hero-card{grid-column:span 2}.light-stat,.peach-stat,.endpoint-card,.server-card,.lan-card{padding:17px!important}.endpoint-host,.lan-metric{font-size:15px}.metric{font-size:31px}.bento-ui .clients-section{padding:18px!important}.form-card,.preview-card{padding:20px!important}.section-head{align-items:flex-start}.section-head h2{font-size:26px}.form-dual{grid-template-columns:1fr 1fr}.create-submit{flex-direction:column;align-items:stretch}.create-submit button{width:100%}.bento-footer{font-size:8px;flex-direction:column}.bento-ui .brand{font-size:12px}}
