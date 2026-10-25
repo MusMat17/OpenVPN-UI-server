@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"time"
 	"testing"
 )
 
@@ -39,29 +40,29 @@ func TestHumanBytes(t *testing.T) {
 	}
 }
 
-func TestLoginCSRFOverHTTPS(t *testing.T) {
-	tpl, err := template.New("pages").ParseFS(webFS, "web/login.html")
-	if err != nil { t.Fatal(err) }
-	a := &App{cfg: Config{AdminHash: hashPassword("test-correct-password")}, t: tpl,
-		sessions: make(map[string]Session), tries: make(map[string]Attempt)}
-	page := httptest.NewRecorder()
-	a.loginPage(page, httptest.NewRequest(http.MethodGet, "https://192.168.40.10:8989/login", nil))
-	if page.Code != http.StatusOK { t.Fatalf("GET login: %d", page.Code) }
-	var csrfCookie *http.Cookie
-	for _, cookie := range page.Result().Cookies() { if cookie.Name == "login_csrf" { csrfCookie = cookie; break } }
-	if csrfCookie == nil { t.Fatal("missing login csrf cookie") }
-	if !csrfCookie.Secure || !csrfCookie.HttpOnly || csrfCookie.SameSite != http.SameSiteLaxMode { t.Fatal("unexpected csrf cookie security attributes") }
-	if !strings.Contains(page.Body.String(), "value=\"" + csrfCookie.Value + "\"") { t.Fatal("csrf cookie and form token differ") }
-	form := url.Values{"csrf": {csrfCookie.Value}, "user": {"admin"}, "password": {"test-correct-password"}}
-	req := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.AddCookie(csrfCookie)
-	response := httptest.NewRecorder()
-	a.login(response, req)
-	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/" { t.Fatalf("login failed: %d %s", response.Code, response.Body.String()) }
-	found := false
-	for _, cookie := range response.Result().Cookies() { if cookie.Name == "oc_session" { found = true } }
-	if !found { t.Fatal("missing session after successful login") }
+func TestLoginCSRFWithoutCookiesOverHTTPS(t *testing.T) {
+    tpl, err := template.New("pages").ParseFS(webFS, "web/login.html")
+    if err != nil { t.Fatal(err) }
+    a := &App{cfg: Config{AdminHash: hashPassword("test-correct-password")}, t: tpl,
+        sessions: make(map[string]Session), tries: make(map[string]Attempt), loginTokens: make(map[string]time.Time)}
+    page := httptest.NewRecorder()
+    a.loginPage(page, httptest.NewRequest(http.MethodGet, "https://192.168.40.10:8989/login", nil))
+    if page.Code != http.StatusOK { t.Fatalf("GET login: %d", page.Code) }
+    if len(page.Result().Cookies()) != 0 { t.Fatal("unexpected pre-login cookie") }
+    var nonce string
+    for token := range a.loginTokens { nonce = token }
+    if nonce == "" || !strings.Contains(page.Body.String(), "value=\"" + nonce + "\"") { t.Fatal("form token missing") }
+    form := url.Values{"csrf": {nonce}, "user": {"admin"}, "password": {"test-correct-password"}}
+    req := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+    req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+    req.Header.Set("Origin", "https://192.168.40.10:8989")
+    response := httptest.NewRecorder()
+    a.login(response, req)
+    if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/" { t.Fatalf("login failed: %d %s", response.Code, response.Body.String()) }
+    found := false
+    for _, cookie := range response.Result().Cookies() { if cookie.Name == "oc_session" && cookie.Secure && cookie.HttpOnly { found = true } }
+    if !found { t.Fatal("missing secure session after login") }
+    if a.consumeLoginToken(nonce) { t.Fatal("login token replay allowed") }
 }
 
 func TestLoginCSRFRejectedAndRecoverable(t *testing.T) {
@@ -69,8 +70,28 @@ func TestLoginCSRFRejectedAndRecoverable(t *testing.T) {
 	form := url.Values{"csrf": {"bogus"}, "user": {"admin"}, "password": {"test-correct-password"}}
 	req := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Origin", "https://192.168.40.10:8989")
 	response := httptest.NewRecorder()
 	a.login(response, req)
 	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/login?error=csrf" { t.Fatalf("unexpected missing CSRF behavior: %d", response.Code) }
 	if len(a.sessions) != 0 { t.Fatal("invalid CSRF permitted authentication") }
+}
+
+func TestLoginCSRFRejectsCrossOriginAndExpiredToken(t *testing.T) {
+    a := &App{cfg: Config{AdminHash: hashPassword("test-correct-password")},
+        sessions: make(map[string]Session), tries: make(map[string]Attempt), loginTokens: map[string]time.Time{}}
+    csrf := randomString(32)
+    a.loginTokens[csrf] = time.Now().Add(10 * time.Minute)
+    form := url.Values{"csrf": {csrf}, "user": {"admin"}, "password": {"test-correct-password"}}
+    for _, origin := range []string{"https://evil.example", "http://192.168.40.10:8989", ""} {
+        req := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+        req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+        if origin != "" { req.Header.Set("Origin", origin) }
+        response := httptest.NewRecorder()
+        a.login(response, req)
+        if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/login?error=csrf" { t.Fatalf("cross-origin login allowed for %q", origin) }
+    }
+    expired := randomString(32)
+    a.loginTokens[expired] = time.Now().Add(-1 * time.Second)
+    if a.consumeLoginToken(expired) { t.Fatal("expired token accepted") }
 }
