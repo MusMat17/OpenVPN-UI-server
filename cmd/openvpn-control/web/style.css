@@ -135,3 +135,25 @@
 @media(max-width:1250px){.bento-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.hero-card{grid-column:span 2;grid-row:span 1}.bento-app{grid-template-columns:205px minmax(0,1fr)}}
 @media(max-width:780px){.bento-app{display:block}.bento-side{position:relative;min-height:0;max-height:none;display:flex;flex-direction:row;align-items:center;padding:13px 18px;gap:14px}.bento-ui .brand{margin:0;font-size:14px}.nav-caption,.side-status{display:none}.bento-nav{display:flex;flex-direction:row;gap:2px;margin-left:auto}.bento-nav a{padding:9px;font-size:0}.bento-nav a span{font-size:21px}.bento-main{padding:28px 17px}.bento-top h1{font-size:34px}.header-tools .secure-indicator{display:none}.bento-stats{gap:12px}.bento-ui .b-card{border-radius:21px}.create-bento-grid{grid-template-columns:1fr}.preview-card,.create-submit{grid-column:span 1}}
 @media(max-width:470px){.bento-top{flex-direction:column;gap:14px}.header-tools{justify-content:flex-end;width:100%}.bento-stats{grid-template-columns:1fr 1fr}.hero-card{grid-column:span 2}.light-stat,.peach-stat,.endpoint-card,.server-card,.lan-card{padding:17px!important}.endpoint-host,.lan-metric{font-size:15px}.metric{font-size:31px}.bento-ui .clients-section{padding:18px!important}.form-card,.preview-card{padding:20px!important}.section-head{align-items:flex-start}.section-head h2{font-size:26px}.form-dual{grid-template-columns:1fr 1fr}.create-submit{flex-direction:column;align-items:stretch}.create-submit button{width:100%}.bento-footer{font-size:8px;flex-direction:column}.bento-ui .brand{font-size:12px}}
+
+
+/* Minimal overview: only two metrics, no decorative hero/server/LAN panels. */
+.bento-ui .bento-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.bento-ui .bento-stats .light-stat,
+.bento-ui .bento-stats .peach-stat {
+  min-height: 190px !important;
+  padding: 26px 30px !important;
+}
+.bento-ui .bento-stats .metric { margin: 16px 0 9px; }
+@media (max-width: 580px) {
+  .bento-ui .bento-stats { grid-template-columns: 1fr; gap: 12px; }
+  .bento-ui .bento-stats .light-stat,
+  .bento-ui .bento-stats .peach-stat {
+    min-height: 150px !important;
+    padding: 20px 22px !important;
+  }
+}
