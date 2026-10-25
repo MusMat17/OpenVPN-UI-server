@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"unicode/utf8"
 	"strconv"
 	"strings"
 	"sync"
@@ -65,6 +66,7 @@ type Client struct {
 }
 type App struct {
 	mu       sync.Mutex
+	profile  ProfileSettings
 	cfg      Config
 	clients  map[string]Client
 	sessions map[string]Session
@@ -72,6 +74,85 @@ type App struct {
 	tries    map[string]Attempt
 	t        *template.Template
 }
+// ProfileSettings only controls newly downloaded .ovpn files. It never
+// alters the OpenVPN daemon's listening port, certificates or NAT rules.
+type ProfileSettings struct {
+    ExternalPort int    `json:"external_port"`
+    Template     string `json:"template"`
+}
+
+const defaultProfileTemplate = `client
+dev tun
+proto {{PROTO}}
+remote {{HOST}} {{PORT}}
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+auth-nocache
+pull-filter ignore "redirect-gateway"
+verb 0
+`
+
+const profileSettingsFile = "profile-settings.json"
+
+func defaultProfile(port int) ProfileSettings {
+    return ProfileSettings{ExternalPort: port, Template: defaultProfileTemplate}
+}
+
+// validateProfileTemplate rejects malformed templates and requires the
+// split-tunnel and TLS protections. Inline credentials are appended separately.
+func validateProfileTemplate(t string) error {
+    if len(t) == 0 || len(t) > 16384 || !utf8.ValidString(t) || strings.ContainsAny(t, "\x00\r") {
+        return fmt.Errorf("template must be valid UTF-8 (1–16384 bytes), without CR or NUL")
+    }
+    for _, token := range []string{"{{HOST}}", "{{PORT}}", "{{PROTO}}"} {
+        if strings.Count(t, token) != 1 { return fmt.Errorf("template must contain %s exactly once", token) }
+    }
+    if strings.Count(t, "{{") != 3 || strings.Count(t, "}}") != 3 {
+        return fmt.Errorf("unsupported placeholder: use only {{HOST}}, {{PORT}}, {{PROTO}}")
+    }
+    lines := strings.Split(t, "\n")
+    required := map[string]bool{
+        "client": false, "dev tun": false, "proto {{PROTO}}": false,
+        "remote {{HOST}} {{PORT}}": false,
+        "remote-cert-tls server": false,
+        `pull-filter ignore "redirect-gateway"`: false,
+    }
+    for _, line := range lines {
+        line = strings.TrimSpace(line)
+        if strings.HasPrefix(line, "#") || strings.HasPrefix(line, ";") || line == "" { continue }
+        if strings.HasPrefix(line, "<") || strings.HasPrefix(line, ">") {
+            return fmt.Errorf("inline certificate blocks are managed by the server, not the template")
+        }
+        if _, ok := required[line]; ok { required[line] = true }
+        fields := strings.Fields(line)
+        if len(fields) > 0 {
+            switch strings.ToLower(fields[0]) {
+            case "ca", "cert", "key", "tls-crypt", "tls-auth", "auth-user-pass",
+                 "script-security", "up", "down", "plugin", "management", "askpass":
+                return fmt.Errorf("directive %q is managed by the system or not allowed", fields[0])
+            }
+        }
+    }
+    for directive, ok := range required {
+        if !ok { return fmt.Errorf("required directive missing: %s", directive) }
+    }
+    return nil
+}
+
+func buildProfileHeader(settings ProfileSettings, host, protocol string) (string, error) {
+    if err := validateProfileTemplate(settings.Template); err != nil { return "", err }
+    if settings.ExternalPort < 1 || settings.ExternalPort > 65535 { return "", fmt.Errorf("invalid external port") }
+    proto := "udp"
+    if protocol == "tcp" { proto = "tcp-client" }
+    return strings.NewReplacer(
+        "{{HOST}}", host, "{{PORT}}", strconv.Itoa(settings.ExternalPort),
+        "{{PROTO}}", proto,
+    ).Replace(settings.Template), nil
+}
+
 type Session struct {
 	CSRF    string
 	Expires time.Time
@@ -91,6 +172,8 @@ type Row struct {
 type View struct {
 	Rows                                           []Row
 	CSRF, Message, VPNPort, VPNProto, LAN, VPNHost string
+	ExternalPort int
+	ProfileTemplate string
 	Active                                         int
 	Total                                          int
 	Now                                            string
@@ -133,8 +216,11 @@ func main() {
 	}
 	a := &App{cfg: cfg, t: t, clients: map[string]Client{}, sessions: map[string]Session{}, loginTokens: map[string]time.Time{}, tries: map[string]Attempt{}}
 	if err := a.load(); err != nil {
-		log.Fatal(err)
-	}
+        log.Fatal(err)
+    }
+    if err := a.loadProfileSettings(); err != nil {
+        log.Fatalf("profile settings: %v", err)
+    }
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /login", a.loginPage)
 	mux.HandleFunc("POST /login", a.login)
@@ -146,6 +232,7 @@ func main() {
 	mux.HandleFunc("POST /clients/{name}/delete", a.auth(a.deleteClient))
 	mux.HandleFunc("POST /clients/{name}/comment", a.auth(a.editComment))
 	mux.HandleFunc("GET /clients/{name}/download", a.auth(a.downloadClient))
+	mux.HandleFunc("POST /profile-settings", a.auth(a.updateProfileSettings))
 	mux.HandleFunc("GET /assets/style.css", func(w http.ResponseWriter, r *http.Request) {
 		serveAsset(w, "web/style.css", "text/css; charset=utf-8")
 	})
@@ -388,6 +475,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 	online := readOnline()
 	a.mu.Lock()
 	rows := make([]Row, 0, len(a.clients))
+	profile := a.profile
 	for _, c := range a.clients {
 		if c.Deleted {
 			continue
@@ -403,7 +491,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			active++
 		}
 	}
-	v := View{Rows: rows, Active: active, Total: len(rows), CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, Now: time.Now().Format("02.01.2006 15:04")}
+	v := View{Rows: rows, Active: active, Total: len(rows), CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalPort: profile.ExternalPort, ProfileTemplate: profile.Template, Now: time.Now().Format("02.01.2006 15:04")}
 	if e := a.t.ExecuteTemplate(w, "dashboard.html", v); e != nil {
 		log.Print(e)
 	}
@@ -575,6 +663,45 @@ func (a *App) editComment(w http.ResponseWriter, r *http.Request) {
 	audit("comment-updated", name)
 	http.Redirect(w, r, "/?msg=updated", 303)
 }
+func (a *App) loadProfileSettings() error {
+    a.profile = defaultProfile(a.cfg.VPNPort)
+    b, err := os.ReadFile(filepath.Join(statePath, profileSettingsFile))
+    if errors.Is(err, os.ErrNotExist) { return nil }
+    if err != nil { return err }
+    if err := json.Unmarshal(b, &a.profile); err != nil { return err }
+    if err := validateProfileTemplate(a.profile.Template); err != nil { return err }
+    if a.profile.ExternalPort < 1 || a.profile.ExternalPort > 65535 {
+        return fmt.Errorf("invalid saved profile external port")
+    }
+    return nil
+}
+func (a *App) updateProfileSettings(w http.ResponseWriter, r *http.Request) {
+    externalPort, err := strconv.Atoi(strings.TrimSpace(r.FormValue("external_port")))
+    if err != nil || externalPort < 1 || externalPort > 65535 {
+        http.Error(w, "External port must be between 1 and 65535", http.StatusBadRequest)
+        return
+    }
+    tmpl := strings.ReplaceAll(r.FormValue("profile_template"), "\r\n", "\n")
+    tmpl = strings.TrimSpace(tmpl) + "\n"
+    if err := validateProfileTemplate(tmpl); err != nil {
+        http.Error(w, "Invalid .ovpn template: "+err.Error(), http.StatusBadRequest)
+        return
+    }
+    settings := ProfileSettings{ExternalPort: externalPort, Template: tmpl}
+    b, err := json.MarshalIndent(settings, "", "  ")
+    if err != nil { http.Error(w, "Could not encode settings", 500); return }
+    a.mu.Lock()
+    err = atomicWrite(filepath.Join(statePath, profileSettingsFile), b, 0600)
+    if err == nil { a.profile = settings }
+    a.mu.Unlock()
+    if err != nil {
+        log.Printf("profile settings save: %v", err)
+        http.Error(w, "Could not save profile settings", 500)
+        return
+    }
+    audit("profile-settings-updated", "admin")
+    http.Redirect(w, r, "/?msg=profile-saved#profile-settings", http.StatusSeeOther)
+}
 func (a *App) downloadClient(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if !validName(name) {
@@ -583,6 +710,7 @@ func (a *App) downloadClient(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	c, ok := a.clients[name]
+	profile := a.profile
 	a.mu.Unlock()
 	if !ok || c.Deleted || c.Revoked {
 		http.Error(w, "not found", 404)
@@ -594,12 +722,11 @@ func (a *App) downloadClient(w http.ResponseWriter, r *http.Request) {
 		{filepath.Join(easyrsaDir, "pki/private", name+".key"), "<key>", "</key>"},
 		{filepath.Join(vpnServerDir, "ta.key"), "<tls-crypt>", "</tls-crypt>"},
 	}
-	var sb strings.Builder
-	proto := "udp"
-	if a.cfg.VPNProto == "tcp" {
-		proto = "tcp-client"
-	}
-	fmt.Fprintf(&sb, "client\ndev tun\nproto %s\nremote %s %d\nresolv-retry infinite\nnobind\npersist-key\npersist-tun\nremote-cert-tls server\nauth-nocache\npull-filter ignore \"redirect-gateway\"\nverb 3\n", proto, a.cfg.VPNHost, a.cfg.VPNPort)
+	header, err := buildProfileHeader(profile, a.cfg.VPNHost, a.cfg.VPNProto)
+    if err != nil { log.Printf("invalid profile settings: %v", err); http.Error(w, "profile settings unavailable", 500); return }
+    var sb strings.Builder
+    sb.WriteString(strings.TrimRight(header, "\n"))
+    sb.WriteByte('\n')
 	for _, p := range pieces {
 		b, e := os.ReadFile(p.path)
 		if e != nil {
