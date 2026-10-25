@@ -1,0 +1,12 @@
+bin/
+*.ovpn
+*.key
+*.pem
+*.p12
+clients.json
+disabled.list
+config.json
+management.pass
+.env
+__pycache__/
+*.pyc
