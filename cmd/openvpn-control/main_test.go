@@ -2,6 +2,7 @@ package main
 
 import (
 	"html/template"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -219,5 +220,46 @@ func TestServerControlledClientProfile(t *testing.T) {
         if _, err := generateClientHeader("vpn.example.net", 2253, v, "udp"); err == nil {
             t.Errorf("invalid verb %d accepted", v)
         }
+    }
+}
+
+func TestManagementStatusAndPersistentConnectionTime(t *testing.T) {
+    started := time.Now().Add(-45*time.Minute).UTC().Truncate(time.Second)
+    status := fmt.Sprintf("SUCCESS: password is correct\nTITLE,OpenVPN 2.6\nTIME,2026-10-29,1793230000\nHEADER,CLIENT_LIST,Common Name,Real Address,Virtual Address,Virtual IPv6 Address,Bytes Received,Bytes Sent,Connected Since,Connected Since (time_t),Username,Client ID,Peer ID,Data Channel Cipher\nCLIENT_LIST,laptop-01,198.51.100.44:1000,10.40.0.2,,2457,5894,2026-10-29,%d,UNDEF,1,1,AES-256-GCM\nEND\n", started.Unix())
+    online, err := parseManagementStatus(status)
+    if err != nil { t.Fatal(err) }
+    got, ok := online["laptop-01"]
+    if !ok { t.Fatal("active connection missing") }
+    if !got.Since.Equal(started) || got.VirtualIP != "10.40.0.2" || got.In != 2457 {
+        t.Fatalf("unexpected status data: %#v", got)
+    }
+    clients := map[string]Client{"laptop-01": {Name:"laptop-01"}}
+    if !updateLastConnected(clients, online) { t.Fatal("first session should update persisted metadata") }
+    if !clients["laptop-01"].LastConnectedAt.Equal(started) { t.Fatal("timestamp not preserved") }
+    if updateLastConnected(clients, online) { t.Fatal("unchanged session should not write metadata again") }
+    if updateLastConnected(clients, map[string]Live{}) { t.Fatal("disconnect must not reset timestamp") }
+    if !clients["laptop-01"].LastConnectedAt.Equal(started) { t.Fatal("timestamp lost on disconnect") }
+    newer := started.Add(10*time.Minute)
+    if !updateLastConnected(clients, map[string]Live{"laptop-01": {Since:newer}}) { t.Fatal("reconnect time not saved") }
+    if !clients["laptop-01"].LastConnectedAt.Equal(newer) { t.Fatal("latest connection not retained") }
+    if updateLastConnected(clients, map[string]Live{"laptop-01": {Since:started}}) { t.Fatal("older timestamp must not overwrite newer one") }
+}
+func TestManagementStatusRejectsPartialOrBadTime(t *testing.T) {
+    for _, status := range []string{"", "SUCCESS: password is correct", "CLIENT_LIST,a,b,c", "ERROR: bad password", "HEADER,CLIENT_LIST,Common Name\nCLIENT_LIST,bad\n"} {
+        if _, err := parseManagementStatus(status); err == nil { t.Fatalf("accepted incomplete management status: %q", status) }
+    }
+}
+func TestLastConnectedColumnRendered(t *testing.T) {
+    tpl, err := template.New("pages").Funcs(template.FuncMap{"size": humanBytes}).ParseFS(webFS, "web/*.html")
+    if err != nil { t.Fatal(err) }
+    started := time.Date(2026, 10, 29, 11, 32, 0, 0, time.UTC)
+    v := View{CSRF: "csrf", Total: 2, Rows: []Row{
+        {Client: Client{Name:"known", LastConnectedAt:started}},
+        {Client: Client{Name:"never"}},
+    }}
+    var buf strings.Builder
+    if err := tpl.ExecuteTemplate(&buf, "dashboard.html", v); err != nil { t.Fatal(err) }
+    for _, expected := range []string{"ПОСЛЕДНЕЕ ПОДКЛЮЧЕНИЕ", "2026-10-29T11:32:00Z", "Нет данных", "Source Sans 3", "IBM Plex Sans", "Inter"} {
+        if !strings.Contains(buf.String(), expected) { t.Errorf("missing %q",expected) }
     }
 }
