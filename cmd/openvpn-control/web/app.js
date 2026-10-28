@@ -16,6 +16,25 @@
     });
   }
 
+  // Color theme is independent of the font preference, and shared with login.
+  const themes = new Set(['sage', 'mist']);
+  const themeDropdown = document.getElementById('theme-choice');
+  let theme = 'sage';
+  try {
+    const savedTheme = localStorage.getItem('openvpn-control-theme');
+    if (themes.has(savedTheme)) theme = savedTheme;
+  } catch (_) { /* Private browsing may disallow storage. */ }
+  document.documentElement.dataset.uiTheme = theme;
+  if (themeDropdown) {
+    themeDropdown.value = theme;
+    themeDropdown.addEventListener('change', () => {
+      if (!themes.has(themeDropdown.value)) return;
+      document.documentElement.dataset.uiTheme = themeDropdown.value;
+      try { localStorage.setItem('openvpn-control-theme', themeDropdown.value); }
+      catch (_) { /* Still applies until the next page load. */ }
+    });
+  }
+
   const host = document.getElementById('external-host');
   const port = document.getElementById('external-port');
   const verb = document.getElementById('verb');
