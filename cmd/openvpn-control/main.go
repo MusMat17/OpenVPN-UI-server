@@ -294,7 +294,12 @@ func serveAsset(w http.ResponseWriter, path, ct string) {
 		return
 	}
 	w.Header().Set("Content-Type", ct)
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+    // CSS and JS must revalidate after a UI-only update; font assets are immutable.
+    if strings.HasPrefix(ct, "font/") {
+        w.Header().Set("Cache-Control", "public, max-age=86400")
+    } else {
+        w.Header().Set("Cache-Control", "no-cache")
+    }
 	w.Write(b)
 }
 func security(next http.Handler) http.Handler {
