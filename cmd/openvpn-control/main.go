@@ -35,6 +35,17 @@ import (
 //go:embed web/*
 var webFS embed.FS
 
+// Asset URLs change automatically whenever embedded CSS or JavaScript changes.
+var assetVersion = func() string {
+    h := sha256.New()
+    for _, path := range []string{"web/style.css", "web/app.js"} {
+        b, err := webFS.ReadFile(path)
+        if err != nil { panic(err) }
+        _, _ = h.Write(b)
+    }
+    return fmt.Sprintf("%x", h.Sum(nil)[:8])
+}()
+
 const (
 	defaultConf  = "/etc/openvpn-control/config.json"
 	statePath    = "/var/lib/openvpn-control"
@@ -201,6 +212,7 @@ type Row struct {
 	BytesOut  string
 }
 type View struct {
+    AssetVersion string
     ServerReachable bool
 	Rows                                           []Row
 	CSRF, Message, VPNPort, VPNProto, LAN, VPNHost string
@@ -394,10 +406,11 @@ func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
     a.mu.Unlock()
     w.Header().Set("Cache-Control", "no-store")
     a.t.ExecuteTemplate(w, "login.html", struct {
+        AssetVersion string
         CSRF string
         Error bool
         CSRFError bool
-    }{csrf, r.URL.Query().Get("error") == "1", r.URL.Query().Get("error") == "csrf"})
+    }{assetVersion, csrf, r.URL.Query().Get("error") == "1", r.URL.Query().Get("error") == "csrf"})
 }
 
 func (a *App) consumeLoginToken(token string) bool {
@@ -543,7 +556,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			active++
 		}
 	}
-	v := View{Rows: rows, Active: active, Total: len(rows), ServerReachable: serverReachable, CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalHost: profile.ExternalHost, ExternalPort: profile.ExternalPort, Verb: profile.Verb, BindIP: a.cfg.BindIP, ClientProto: map[bool]string{true:"tcp-client",false:"udp"}[a.cfg.VPNProto == "tcp"], Now: time.Now().Format("02.01.2006 15:04")}
+	v := View{AssetVersion: assetVersion, Rows: rows, Active: active, Total: len(rows), ServerReachable: serverReachable, CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalHost: profile.ExternalHost, ExternalPort: profile.ExternalPort, Verb: profile.Verb, BindIP: a.cfg.BindIP, ClientProto: map[bool]string{true:"tcp-client",false:"udp"}[a.cfg.VPNProto == "tcp"], Now: time.Now().Format("02.01.2006 15:04")}
 	if e := a.t.ExecuteTemplate(w, "dashboard.html", v); e != nil {
 		log.Print(e)
 	}
