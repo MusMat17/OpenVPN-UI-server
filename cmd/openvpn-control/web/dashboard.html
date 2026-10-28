@@ -1,6 +1,6 @@
 {{define "dashboard.html"}}
 <!doctype html>
-<html lang="ru" data-ui-font="source">
+<html lang="ru" data-ui-font="source" data-ui-theme="sage">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,6 +23,12 @@
           <option value="source">Source Sans 3</option>
           <option value="plex">IBM Plex Sans</option>
           <option value="inter">Inter</option>
+        </select>
+      </label>
+      <label class="fontctl theme-ctl" for="theme-choice"><span>Тема</span>
+        <select id="theme-choice" aria-label="Цветовая тема интерфейса">
+          <option value="sage">Sage · шалфей</option>
+          <option value="mist">Mist · лаванда</option>
         </select>
       </label>
       <form class="logout-form" method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="user" type="submit" title="Выйти из панели" aria-label="Выйти из панели">AD</button></form>
