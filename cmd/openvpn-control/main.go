@@ -891,6 +891,95 @@ func readOnline() map[string]Live {
 	}
 	return out
 }
+// The local OpenVPN management status exposes "Connected Since (time_t)".
+// This is persisted so the most recently observed connection survives logout
+// and service restarts without changing the OpenVPN server's configuration.
+func parseManagementStatus(body string) (map[string]Live, error) {
+    online := make(map[string]Live)
+    scanner := bufio.NewScanner(strings.NewReader(body))
+    scanner.Buffer(make([]byte, 4096), 1<<20)
+    var columns map[string]int
+    ended := false
+    for scanner.Scan() {
+        line := strings.TrimSuffix(scanner.Text(), "\r")
+        if line == "END" { ended = true; break }
+        if !strings.HasPrefix(line, "HEADER,CLIENT_LIST,") && !strings.HasPrefix(line, "CLIENT_LIST,") { continue }
+        reader := csv.NewReader(strings.NewReader(line))
+        reader.FieldsPerRecord = -1
+        cells, err := reader.Read()
+        if err != nil { return nil, err }
+        if len(cells) < 2 { continue }
+        if cells[0] == "HEADER" && cells[1] == "CLIENT_LIST" {
+            columns = make(map[string]int)
+            for i, col := range cells[2:] { columns[strings.TrimSpace(col)] = i+1 }
+            continue
+        }
+        if cells[0] != "CLIENT_LIST" || columns == nil { continue }
+        field := func(name string) string {
+            i, ok := columns[name]
+            if !ok || i >= len(cells) { return "" }
+            return cells[i]
+        }
+        name := field("Common Name")
+        if !validName(name) { continue }
+        epoch, _ := strconv.ParseInt(field("Connected Since (time_t)"), 10, 64)
+        if epoch <= 0 || epoch > time.Now().Add(5*time.Minute).Unix() { continue }
+        bytesIn, _ := strconv.ParseUint(field("Bytes Received"), 10, 64)
+        bytesOut, _ := strconv.ParseUint(field("Bytes Sent"), 10, 64)
+        record := Live{VirtualIP: field("Virtual Address"), RealIP: field("Real Address"),
+            In: bytesIn, Out: bytesOut, Since: time.Unix(epoch, 0).UTC()}
+        if previous, ok := online[name]; !ok || record.Since.After(previous.Since) {
+            online[name] = record
+        }
+    }
+    if err := scanner.Err(); err != nil { return nil, err }
+    if !ended || columns == nil { return nil, errors.New("incomplete OpenVPN management status") }
+    return online, nil
+}
+func queryManagementConnections() (map[string]Live, error) {
+    password, err := os.ReadFile("/etc/openvpn-control/management.pass")
+    if err != nil { return nil, err }
+    conn, err := net.DialTimeout("tcp", "127.0.0.1:2080", 2*time.Second)
+    if err != nil { return nil, err }
+    defer conn.Close()
+    if err := conn.SetDeadline(time.Now().Add(5*time.Second)); err != nil { return nil, err }
+    var banner [4096]byte
+    if _, err := conn.Read(banner[:]); err != nil { return nil, err }
+    if _, err := io.WriteString(conn, strings.TrimSpace(string(password))+"\nstatus 2\nquit\n"); err != nil { return nil, err }
+    body, err := io.ReadAll(io.LimitReader(conn, 1<<20))
+    if err != nil { return nil, err }
+    return parseManagementStatus(string(body))
+}
+func (a *App) refreshConnections() {
+    online, err := queryManagementConnections()
+    if err != nil {
+        fallback := readOnline()
+        if len(fallback) == 0 { return }
+        online = fallback
+    }
+    a.mu.Lock()
+    defer a.mu.Unlock()
+    changed := false
+    for name, live := range online {
+        client, exists := a.clients[name]
+        if !exists || client.Deleted || live.Since.IsZero() { continue }
+        if live.Since.After(client.LastConnectedAt) {
+            client.LastConnectedAt = live.Since
+            a.clients[name] = client
+            changed = true
+        }
+    }
+    a.online = online
+    if changed {
+        if err := a.save(); err != nil { log.Printf("save last connection times: %v", err) }
+    }
+}
+func (a *App) monitorConnections() {
+    ticker := time.NewTicker(10 * time.Second)
+    defer ticker.Stop()
+    for range ticker.C { a.refreshConnections() }
+}
+
 func humanBytes(n uint64) string {
 	if n < 1024 {
 		return fmt.Sprintf("%d B", n)
