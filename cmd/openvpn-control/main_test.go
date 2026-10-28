@@ -263,3 +263,48 @@ func TestLastConnectedColumnRendered(t *testing.T) {
         if !strings.Contains(buf.String(), expected) { t.Errorf("missing %q",expected) }
     }
 }
+
+func TestSageStylesAndVersionedAssets(t *testing.T) {
+    if len(assetVersion) != 16 {
+        t.Fatalf("asset hash must change with CSS/JS; got %q", assetVersion)
+    }
+    style, err := webFS.ReadFile("web/style.css")
+    if err != nil { t.Fatal(err) }
+    css := string(style)
+    for _, selector := range []string{
+        "body.sage-ui", "body.sage-login", ".login-stage",
+        "OC Source Sans 3", "OC IBM Plex Sans", "OC Inter",
+        "html[data-ui-font=\"plex\"]",
+    } {
+        if !strings.Contains(css, selector) {
+            t.Errorf("Sage CSS missing %q", selector)
+        }
+    }
+    if strings.Contains(css, ".hero-card{") {
+        t.Fatal("legacy style was not cleared")
+    }
+    pages, err := template.New("pages").Funcs(template.FuncMap{"size":humanBytes}).ParseFS(webFS, "web/*.html")
+    if err != nil { t.Fatal(err) }
+    login := struct { AssetVersion, CSRF string; Error, CSRFError bool }{
+        assetVersion, "test-csrf", false, false,
+    }
+    var out strings.Builder
+    if err := pages.ExecuteTemplate(&out, "login.html", login); err != nil { t.Fatal(err) }
+    for _, expected := range []string{
+        "style.css?v="+assetVersion, "app.js?v="+assetVersion,
+        "name=\"csrf\"", "sage-login", "Вход в панель",
+    } {
+        if !strings.Contains(out.String(), expected) {
+            t.Errorf("login page missing %q", expected)
+        }
+    }
+    out.Reset()
+    if err := pages.ExecuteTemplate(&out, "dashboard.html", View{AssetVersion:assetVersion}); err != nil { t.Fatal(err) }
+    for _, expected := range []string{
+        "style.css?v="+assetVersion, "app.js?v="+assetVersion, "sage-ui",
+    } {
+        if !strings.Contains(out.String(), expected) {
+            t.Errorf("dashboard page missing %q", expected)
+        }
+    }
+}
