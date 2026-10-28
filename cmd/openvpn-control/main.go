@@ -7,6 +7,8 @@ import (
 	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
+	"bufio"
+	"encoding/csv"
 	"embed"
 	"encoding/base64"
 	"encoding/json"
@@ -67,10 +69,12 @@ type Client struct {
     ExternalPort int `json:"external_port,omitempty"`
     Verb int `json:"verb"`
     ProfileConfigured bool `json:"profile_configured,omitempty"`
+    LastConnectedAt time.Time `json:"last_connected_at,omitempty"`
 }
 type App struct {
 	mu       sync.Mutex
 	profile  ProfileSettings
+    online map[string]Live
 	cfg      Config
 	clients  map[string]Client
 	sessions map[string]Session
@@ -250,6 +254,8 @@ func main() {
     if err := a.loadProfileSettings(); err != nil {
         log.Fatalf("profile settings: %v", err)
     }
+    a.refreshConnections()
+    go a.monitorConnections()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /login", a.loginPage)
 	mux.HandleFunc("POST /login", a.login)
@@ -264,6 +270,16 @@ func main() {
 		mux.HandleFunc("GET /assets/style.css", func(w http.ResponseWriter, r *http.Request) {
 		serveAsset(w, "web/style.css", "text/css; charset=utf-8")
 	})
+    mux.HandleFunc("GET /assets/fonts/{font}", func(w http.ResponseWriter, r *http.Request) {
+        allowed := map[string]string{
+            "inter.ttf": "web/font-inter.ttf",
+            "ibm-plex-sans.ttf": "web/font-ibm-plex-sans.ttf",
+            "source-sans-3.ttf": "web/font-source-sans-3.ttf",
+        }
+        path, ok := allowed[r.PathValue("font")]
+        if !ok { http.NotFound(w, r); return }
+        serveAsset(w, path, "font/ttf")
+    })
 	mux.HandleFunc("GET /assets/app.js", func(w http.ResponseWriter, r *http.Request) {
 		serveAsset(w, "web/app.js", "application/javascript; charset=utf-8")
 	})
@@ -499,9 +515,9 @@ func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
-	_, s, _ := a.session(r)
-	online := readOnline()
-	a.mu.Lock()
+    _, s, _ := a.session(r)
+    a.mu.Lock()
+    online := a.online
 	rows := make([]Row, 0, len(a.clients))
 	profile := a.profile
 	for _, c := range a.clients {
@@ -855,6 +871,7 @@ func audit(op, name string) {
 type Live struct {
 	VirtualIP, RealIP string
 	In, Out           uint64
+    Since time.Time
 }
 
 func readOnline() map[string]Live {
