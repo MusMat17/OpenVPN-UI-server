@@ -1,14 +1,42 @@
-{{define "login.html"}}<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenVPN Control · Вход</title><link rel="stylesheet" href="/assets/style.css"><style>
-body.login-body{min-height:100vh;background:#eaebed;color:#23262c;font-family:'Inter','Plus Jakarta Sans',system-ui,-apple-system,'Segoe UI',sans-serif}
-.login-shell{background:#fff;border:1px solid #f4f4f6;border-radius:28px;box-shadow:0 28px 70px rgba(38,32,49,.07);padding:43px 42px}
-.brand-mark{background:#27262e;box-shadow:none;border-radius:13px;font-family:'Inter Display','Inter',sans-serif}
-.login-shell h1{color:#29272e;font-family:'Inter Display','Inter',sans-serif;letter-spacing:-1.7px;font-weight:780}
-.login-shell h1 span{color:#6256da}
-.login-shell p{color:#9697a1}
-.login-form input{background:#f7f7fa;border-color:#e9e8ed;color:#272735}
-.login-form input:focus{border-color:#867be9;box-shadow:0 0 0 3px rgba(99,85,221,.12)}
-.login-form button.primary{background:#6256de;color:#fff;border:0;box-shadow:0 10px 22px rgba(94,80,208,.20);border-radius:13px}
-.login-form button.primary:hover{background:#4e43bf}
-.login-footer{color:#aaa8af}
-@media(max-width:500px){.login-shell{padding:33px 24px;border-radius:24px}}
-</style><script src="/assets/app.js" defer></script></head><body class="login-body"><div class="ambient ambient-one"></div><div class="ambient ambient-two"></div><main class="login-shell"><div class="brand-mark">◎</div><div class="eyebrow">SECURE ACCESS</div><h1>OpenVPN<br><span>Control</span></h1><p class="muted">Управляйте частной сетью просто и безопасно.</p>{{if .Error}}<div class="alert">Неверный логин или пароль.</div>{{end}}{{if .CSRFError}}<div class="alert">Не удалось подтвердить запрос входа. Открой страницу входа заново. Если ошибка повторится, требуется диагностика панели на сервере.</div>{{end}}<form method="post" action="/login" class="login-form"><input type="hidden" name="csrf" value="{{.CSRF}}"><label>Логин<input name="user" type="text" value="admin" autocomplete="username" required></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required autofocus></label><button type="submit" class="primary full">Войти <span>→</span></button></form><div class="login-footer">Local-first · TLS secured</div></main></body></html>{{end}}
+{{define "login.html"}}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>OpenVPN Control — Вход</title>
+  <link rel="stylesheet" href="/assets/style.css?v={{.AssetVersion}}">
+  <script src="/assets/app.js?v={{.AssetVersion}}" defer></script>
+</head>
+<body class="sage-login">
+  <header class="login-topbar">
+    <a href="/login" class="brand"><span class="symbol">◇</span> openvpn <span>CONTROL</span></a>
+    <span class="login-topnote">Локальный доступ · защищён HTTPS</span>
+  </header>
+  <main class="login-stage">
+    <section class="login-panel" aria-labelledby="login-title">
+      <div class="overline">УПРАВЛЕНИЕ ДОСТУПОМ / DASHBOARD</div>
+      <h1 id="login-title">Вход в панель</h1>
+      <p class="login-description">Управление клиентами VPN и сертификатами.</p>
+      {{if .Error}}<div class="login-alert" role="alert">Неверный логин или пароль.</div>{{end}}
+      {{if .CSRFError}}<div class="login-alert" role="alert">Не удалось подтвердить запрос входа. Открой страницу заново и повтори попытку.</div>{{end}}
+      <form method="post" action="/login" class="sage-login-form">
+        <input type="hidden" name="csrf" value="{{.CSRF}}">
+        <label for="login-user">Логин</label>
+        <input id="login-user" name="user" type="text" value="admin" autocomplete="username" required>
+        <label for="login-password">Пароль</label>
+        <input id="login-password" name="password" type="password" placeholder="Введите пароль" autocomplete="current-password" required autofocus>
+        <button type="submit">Войти в панель <span aria-hidden="true">→</span></button>
+      </form>
+      <div class="login-footer">OpenVPN Control · Private network</div>
+    </section>
+    <aside class="login-aside" aria-hidden="true">
+      <div class="aside-overline">PRIVATE NETWORK</div>
+      <div class="aside-design"><span class="aside-circle one"></span><span class="aside-circle two"></span><span class="aside-center">◇</span></div>
+      <div class="aside-bottom"><strong>Контроль доступа.<br>Без лишнего.</strong><p>Сертификаты, подключения и конфигурации в одном пространстве.</p><span class="aside-pill">● Split Tunnel</span></div>
+    </aside>
+  </main>
+</body>
+</html>
+{{end}}
