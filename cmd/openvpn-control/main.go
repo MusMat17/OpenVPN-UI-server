@@ -950,6 +950,19 @@ func queryManagementConnections() (map[string]Live, error) {
     if err != nil { return nil, err }
     return parseManagementStatus(string(body))
 }
+func updateLastConnected(clients map[string]Client, online map[string]Live) bool {
+    changed := false
+    for name, live := range online {
+        client, exists := clients[name]
+        if !exists || client.Deleted || live.Since.IsZero() { continue }
+        if live.Since.After(client.LastConnectedAt) {
+            client.LastConnectedAt = live.Since
+            clients[name] = client
+            changed = true
+        }
+    }
+    return changed
+}
 func (a *App) refreshConnections() {
     online, err := queryManagementConnections()
     if err != nil {
@@ -959,16 +972,7 @@ func (a *App) refreshConnections() {
     }
     a.mu.Lock()
     defer a.mu.Unlock()
-    changed := false
-    for name, live := range online {
-        client, exists := a.clients[name]
-        if !exists || client.Deleted || live.Since.IsZero() { continue }
-        if live.Since.After(client.LastConnectedAt) {
-            client.LastConnectedAt = live.Since
-            a.clients[name] = client
-            changed = true
-        }
-    }
+    changed := updateLastConnected(a.clients, online)
     a.online = online
     if changed {
         if err := a.save(); err != nil { log.Printf("save last connection times: %v", err) }
