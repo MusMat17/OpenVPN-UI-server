@@ -18,3 +18,33 @@ document.querySelectorAll('form[data-confirm]').forEach(form=>form.addEventListe
   [host,port,verb].forEach(field => field.addEventListener('input',render));
   render();
 })();
+
+
+/* Font preference is browser-local; the HTTPS application needs no external CDN. */
+(() => {
+  const fonts = new Set(['source', 'plex', 'inter']);
+  const dropdown = document.getElementById('font-choice');
+  let selected = 'source';
+  try {
+    const stored = localStorage.getItem('openvpn-control-font');
+    if (fonts.has(stored)) selected = stored;
+  } catch (_) { /* Private browsing may disable storage. */ }
+  document.documentElement.dataset.uiFont = selected;
+  if (dropdown) {
+    dropdown.value = selected;
+    dropdown.addEventListener('change', () => {
+      if (!fonts.has(dropdown.value)) return;
+      document.documentElement.dataset.uiFont = dropdown.value;
+      try { localStorage.setItem('openvpn-control-font', dropdown.value); }
+      catch (_) { /* Selection still works for this page. */ }
+    });
+  }
+  document.querySelectorAll('time.last-connected[datetime]').forEach(el => {
+    const date = new Date(el.dateTime);
+    if (Number.isNaN(date.getTime())) return;
+    el.textContent = new Intl.DateTimeFormat('ru-RU', {
+      year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'
+    }).format(date);
+    el.title = 'Время в часовом поясе браузера';
+  });
+})();
