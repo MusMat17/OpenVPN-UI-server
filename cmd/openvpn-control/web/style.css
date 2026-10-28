@@ -69,3 +69,163 @@ body.sage-login{min-height:100vh;background:#f5f4f0;color:#2a3532;font-size:14px
 .aside-pill{font-size:11px;font-weight:750;color:#5d826c;background:#ffffff80;border-radius:100px;padding:9px 13px;display:inline-flex}
 @media(max-width:800px){.login-stage{grid-template-columns:1fr;max-width:560px}.login-aside{display:none}.login-panel{padding:32px}.login-topbar{padding:0 20px}}
 @media(max-width:450px){.login-topnote{display:none}.login-stage{width:calc(100% - 28px);margin-top:25px}.login-panel{padding:27px 22px}.login-panel h1{font-size:30px}}
+
+
+/* User-selectable color palette. Sage is the established default, Mist mirrors
+   the lavender/ice contrast of the original Mist Console design (variant A).
+   Selector specificity keeps the override scoped without changing layout. */
+.sage-ui .theme-ctl select{min-width:155px}
+.sage-ui .navtools{flex-wrap:wrap;justify-content:flex-end;row-gap:7px}
+.sage-ui .theme-ctl select:focus-visible,
+.sage-ui .fontctl select:focus-visible{outline:2px solid #716bb8;outline-offset:2px}
+@media(max-width:1000px){
+  .sage-ui .tabs{margin-left:16px;gap:2px}
+  .sage-ui .tab{padding:9px 10px}
+  .sage-ui .navtools{column-gap:8px}
+}
+@media(max-width:850px){
+  .sage-ui .topinner{flex-wrap:wrap}
+  .sage-ui .tabs{order:3;width:100%;margin:0}
+  .sage-ui .navtools{margin-left:auto}
+}
+@media(max-width:470px){
+  .sage-ui .navtools{width:100%;justify-content:flex-start}
+  .sage-ui .fontctl{flex:1 1 155px}
+  .sage-ui .fontctl select{min-width:0;width:100%}
+}
+
+/* Mist / lavender & ice: the high-contrast pastel colors of variant A. */
+html[data-ui-theme="mist"]{
+  --bg:#f1f3f8;
+  --ink:#293248;
+  --muted:#657189;
+  --line:#e0e5f0;
+  --sage:#f0eefe;
+  --olive:#625eae;
+  --white:#ffffff;
+  --sand:#eaf3fd;
+  --mist-primary:#5d5aaa;
+  --mist-heading:#26324a;
+  --mist-subtle:#68738b;
+}
+html[data-ui-theme="mist"] body.sage-ui,
+html[data-ui-theme="mist"] body.sage-login{background:#f1f3f8;color:#293248}
+html[data-ui-theme="mist"] .topbar,
+html[data-ui-theme="mist"] .login-topbar{background:#fff;border-bottom-color:#dde3f0}
+html[data-ui-theme="mist"] .brand{color:#273249}
+html[data-ui-theme="mist"] .brand .symbol,
+html[data-ui-theme="mist"] .login-topbar .symbol{background:#59558e;color:#fff}
+html[data-ui-theme="mist"] .brand span:last-child{color:#7d87a0}
+html[data-ui-theme="mist"] .tab{color:#6f7b92}
+html[data-ui-theme="mist"] .tab.active,
+html[data-ui-theme="mist"] .tab:hover{background:#eeedff;color:#514d96}
+html[data-ui-theme="mist"] .fontctl{color:#65718a}
+html[data-ui-theme="mist"] .fontctl select,
+html[data-ui-theme="mist"] .theme-ctl select{background:#fff;border-color:#d9dfed;color:#394561}
+html[data-ui-theme="mist"] .fontctl select:focus-visible,
+html[data-ui-theme="mist"] .theme-ctl select:focus-visible{outline-color:#6561b1}
+html[data-ui-theme="mist"] .user{background:#ececff;color:#5b55a1}
+html[data-ui-theme="mist"] .head h1,
+html[data-ui-theme="mist"] .sectiontop h2,
+html[data-ui-theme="mist"] .previewtop h3{color:#27334a}
+html[data-ui-theme="mist"] .overline{color:#6e71ae}
+html[data-ui-theme="mist"] .head p,
+html[data-ui-theme="mist"] .sectiontop p,
+html[data-ui-theme="mist"] .subhint,
+html[data-ui-theme="mist"] .previewhint{color:#65738d}
+html[data-ui-theme="mist"] .headnote{
+  background:#f9faff;border-color:#dfe5f2;color:#505c8e
+}
+html[data-ui-theme="mist"] .headnote:before{background:#8682df}
+html[data-ui-theme="mist"] .kpi{border-color:#dedff0}
+html[data-ui-theme="mist"] .kpi:nth-child(1){background:#eeedff}
+html[data-ui-theme="mist"] .kpi:nth-child(2){background:#e9f3fc}
+html[data-ui-theme="mist"] .kpi .tag{color:#65618f}
+html[data-ui-theme="mist"] .kpi:nth-child(2) .tag{color:#426988}
+html[data-ui-theme="mist"] .kpi .value{color:#373b76}
+html[data-ui-theme="mist"] .kpi:nth-child(2) .value{color:#326a91}
+html[data-ui-theme="mist"] .kpi .hint{color:#707398}
+html[data-ui-theme="mist"] .kpi:nth-child(2) .hint{color:#5a7e99}
+html[data-ui-theme="mist"] .kpi .graphic{background:#ffffffbf;color:#6661b0}
+html[data-ui-theme="mist"] .kpi:nth-child(2) .graphic{color:#4d87bb}
+html[data-ui-theme="mist"] .surface{
+  background:#fff;border-color:#e1e5f0;box-shadow:0 5px 24px #3f477d0d
+}
+html[data-ui-theme="mist"] .badge{background:#eeedfd;color:#55529a}
+html[data-ui-theme="mist"] .badge.sand{background:#e9f3fe;color:#386f99}
+html[data-ui-theme="mist"] .badge-unknown{background:#f3f3f8;color:#6e7689}
+html[data-ui-theme="mist"] .table th{
+  background:#f4f6fc;color:#586782;
+  border-top-color:#e2e7f2;border-bottom-color:#e2e7f2
+}
+html[data-ui-theme="mist"] .table td{
+  color:#39465f;border-bottom-color:#e9edf5
+}
+html[data-ui-theme="mist"] .identity strong{color:#28354b}
+html[data-ui-theme="mist"] .identity small,
+html[data-ui-theme="mist"] .subdate{color:#66758d}
+html[data-ui-theme="mist"] .initial{background:#efefff;color:#5c55a2}
+html[data-ui-theme="mist"] .status.online{background:#e6f5ed;color:#2f7656}
+html[data-ui-theme="mist"] .status.offline{background:#eef1f7;color:#596881}
+html[data-ui-theme="mist"] .status.blocked{background:#fbecf0;color:#a24d69}
+html[data-ui-theme="mist"] .tool{background:#eceaff;color:#5550a0}
+html[data-ui-theme="mist"] .tool.gray{background:#eef1f8;color:#59667e}
+html[data-ui-theme="mist"] .sectionfoot{background:#f8f9fd;color:#64728b}
+html[data-ui-theme="mist"] .newform label{color:#4e5b78}
+html[data-ui-theme="mist"] .newform input,
+html[data-ui-theme="mist"] .newform select{
+  background:#fff;border-color:#dce3f1;color:#26364f
+}
+html[data-ui-theme="mist"] .newform input:focus,
+html[data-ui-theme="mist"] .newform select:focus{
+  border-color:#8a80ca;box-shadow:0 0 0 3px #eeebfd
+}
+html[data-ui-theme="mist"] .primary,
+html[data-ui-theme="mist"] .sage-login-form button{background:#5d5aaa;color:#fff}
+html[data-ui-theme="mist"] .primary:hover,
+html[data-ui-theme="mist"] .sage-login-form button:hover{background:#4d4b95}
+html[data-ui-theme="mist"] .previewcard{
+  background:#f6f7fd;border-color:#dfe5f2
+}
+html[data-ui-theme="mist"] .chip{background:#eaeafb;color:#5451a0}
+html[data-ui-theme="mist"] #profile-preview{
+  background:#fff;border-color:#dfe3ef;color:#36435d
+}
+html[data-ui-theme="mist"] .comment-inline input{color:#5e6c86}
+html[data-ui-theme="mist"] .comment-inline input:focus,
+html[data-ui-theme="mist"] .comment-inline input:hover{
+  background:#f6f7fc;border-color:#dce3f2
+}
+html[data-ui-theme="mist"] .comment-inline button{
+  background:#efedfc;color:#5b55a6
+}
+html[data-ui-theme="mist"] .flash{
+  background:#f5f2ff;border-color:#dad4fb;color:#58529e
+}
+
+/* Login is themed too, including before and after authentication. */
+html[data-ui-theme="mist"] .login-topnote{color:#627198}
+html[data-ui-theme="mist"] .login-stage{
+  background:#fff;border-color:#dfe5f1;box-shadow:0 22px 70px #48517b16
+}
+html[data-ui-theme="mist"] .login-panel h1{color:#28334b}
+html[data-ui-theme="mist"] .login-description{color:#66748b}
+html[data-ui-theme="mist"] .sage-login-form label{color:#485976}
+html[data-ui-theme="mist"] .sage-login-form input{
+  background:#fafbff;border-color:#dbe1ef;color:#26334b
+}
+html[data-ui-theme="mist"] .sage-login-form input:focus{
+  border-color:#8782cb;box-shadow:0 0 0 3px #eeedfb
+}
+html[data-ui-theme="mist"] .login-footer{color:#7c87a1}
+html[data-ui-theme="mist"] .login-aside{
+  background:linear-gradient(135deg,#e7e5fa,#e3f0fc)
+}
+html[data-ui-theme="mist"] .aside-overline{color:#6464a0}
+html[data-ui-theme="mist"] .aside-circle{border-color:#9b9ad38c}
+html[data-ui-theme="mist"] .aside-center{
+  background:#f7f6ff;color:#6660b0;box-shadow:0 17px 44px #6e70b030
+}
+html[data-ui-theme="mist"] .aside-bottom strong{color:#373d70}
+html[data-ui-theme="mist"] .aside-bottom p{color:#60728d}
+html[data-ui-theme="mist"] .aside-pill{background:#ffffff9c;color:#505997}
