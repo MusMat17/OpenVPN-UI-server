@@ -67,7 +67,7 @@
         <h2>Список клиентов</h2>
         <p>Актуальные состояния и история последнего подключения</p>
       </div>
-      <span class="badge">● OpenVPN доступен</span>
+      {{if .ServerReachable}}<span class="badge">● OpenVPN доступен</span>{{else}}<span class="badge badge-unknown">Статус OpenVPN неизвестен</span>{{end}}
     </div>
     <div class="tablewrap">
       <table class="table">

@@ -250,3 +250,6 @@ button,input,select{font:inherit}button{cursor:pointer}a{color:inherit;text-deco
 .sage-ui .comment-inline button {appearance:none;border:0;border-radius:6px;padding:3px 6px;background:#eaf1e9;color:#548165;cursor:pointer;font-weight:700}
 .sage-ui .tool:focus-visible,.sage-ui .primary:focus-visible,.sage-ui .tab:focus-visible {outline:2px solid #527c68;outline-offset:2px}
 .sage-ui .last-connected {font-variant-numeric:tabular-nums}
+
+/* Only show connected state when the management endpoint responds. */
+.sage-ui .badge-unknown{background:#f4f2e9;color:#8c8574}

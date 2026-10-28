@@ -75,6 +75,7 @@ type App struct {
 	mu       sync.Mutex
 	profile  ProfileSettings
     online map[string]Live
+    serverReachable bool
 	cfg      Config
 	clients  map[string]Client
 	sessions map[string]Session
@@ -200,6 +201,7 @@ type Row struct {
 	BytesOut  string
 }
 type View struct {
+    ServerReachable bool
 	Rows                                           []Row
 	CSRF, Message, VPNPort, VPNProto, LAN, VPNHost string
     ExternalPort int
@@ -523,6 +525,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
     _, s, _ := a.session(r)
     a.mu.Lock()
     online := a.online
+    serverReachable := a.serverReachable
 	rows := make([]Row, 0, len(a.clients))
 	profile := a.profile
 	for _, c := range a.clients {
@@ -540,7 +543,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			active++
 		}
 	}
-	v := View{Rows: rows, Active: active, Total: len(rows), CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalHost: profile.ExternalHost, ExternalPort: profile.ExternalPort, Verb: profile.Verb, BindIP: a.cfg.BindIP, ClientProto: map[bool]string{true:"tcp-client",false:"udp"}[a.cfg.VPNProto == "tcp"], Now: time.Now().Format("02.01.2006 15:04")}
+	v := View{Rows: rows, Active: active, Total: len(rows), ServerReachable: serverReachable, CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalHost: profile.ExternalHost, ExternalPort: profile.ExternalPort, Verb: profile.Verb, BindIP: a.cfg.BindIP, ClientProto: map[bool]string{true:"tcp-client",false:"udp"}[a.cfg.VPNProto == "tcp"], Now: time.Now().Format("02.01.2006 15:04")}
 	if e := a.t.ExecuteTemplate(w, "dashboard.html", v); e != nil {
 		log.Print(e)
 	}
@@ -970,13 +973,15 @@ func updateLastConnected(clients map[string]Client, online map[string]Live) bool
 }
 func (a *App) refreshConnections() {
     online, err := queryManagementConnections()
+    reachable := err == nil
     if err != nil {
-        fallback := readOnline()
-        if len(fallback) == 0 { return }
-        online = fallback
+        // Fallback is only for the online-client snapshot. A management error
+        // must not be presented as proof that the OpenVPN server is healthy.
+        online = readOnline()
     }
     a.mu.Lock()
     defer a.mu.Unlock()
+    a.serverReachable = reachable
     changed := updateLastConnected(a.clients, online)
     a.online = online
     if changed {
