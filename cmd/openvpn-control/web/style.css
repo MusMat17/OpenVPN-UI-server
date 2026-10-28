@@ -157,3 +157,61 @@
     padding: 20px 22px !important;
   }
 }
+
+
+/* Offline, OFL-licensed fonts bundled with the Go application.
+   Display hinting and normal-weight labels prioritize readability on Windows. */
+@font-face{font-family:"OC Source Sans 3";src:url("/assets/fonts/source-sans-3.ttf") format("truetype");font-style:normal;font-weight:200 900;font-display:swap}
+@font-face{font-family:"OC IBM Plex Sans";src:url("/assets/fonts/ibm-plex-sans.ttf") format("truetype");font-style:normal;font-weight:100 900;font-display:swap}
+@font-face{font-family:"OC Inter";src:url("/assets/fonts/inter.ttf") format("truetype");font-style:normal;font-weight:100 900;font-display:swap}
+html{--oc-ui-font:"OC Source Sans 3",Arial,sans-serif}
+html[data-ui-font="plex"]{--oc-ui-font:"OC IBM Plex Sans",Arial,sans-serif}
+html[data-ui-font="inter"]{--oc-ui-font:"OC Inter",Arial,sans-serif}
+html[data-ui-font="source"]{--oc-ui-font:"OC Source Sans 3",Arial,sans-serif}
+html body,html body button,html body input,html body select,html body textarea{
+    font-family:var(--oc-ui-font)!important;
+    -webkit-font-smoothing:auto;
+    -moz-osx-font-smoothing:auto;
+    text-rendering:optimizeLegibility
+}
+html body{font-synthesis:none}
+.bento-ui .font-switch{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#5e6371;font-weight:650}
+.bento-ui .font-switch select{min-width:147px;min-height:35px;padding:7px 25px 7px 10px;border:1px solid #dddde9;background:#fff;color:#313445;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer}
+.bento-ui .font-switch select:focus-visible{outline:2px solid #7569d9;outline-offset:2px}
+.bento-ui .bento-table th{font-size:11px;letter-spacing:.45px;font-weight:700;padding:11px 10px}
+.bento-ui .bento-table td{font-size:12px;padding:12px 10px}
+.bento-ui .bento-table{min-width:950px}
+.bento-ui .bento-table .last-connected-cell{white-space:nowrap;color:#454757;font-size:12px;font-variant-numeric:tabular-nums}
+.bento-ui .bento-table .muted-inline{font-size:11px}
+.bento-ui .metric-caption,.bento-ui .card-topline,.bento-ui .section-head p{font-size:12px}
+.bento-ui .client-entry small{font-size:11px}
+
+/* Approx. 15% reduction of vertical footprint without shrinking text. */
+.bento-ui .bento-main{padding-top:24px;padding-bottom:24px}
+.bento-ui .bento-top{margin-bottom:22px}
+.bento-ui .bento-stats{gap:15px;margin-bottom:21px}
+.bento-ui .bento-stats .light-stat,.bento-ui .bento-stats .peach-stat{
+    min-height:160px!important;padding:21px 25px!important
+}
+.bento-ui .bento-stats .metric{margin:12px 0 7px}
+.bento-ui .clients-section{padding:24px!important;margin-bottom:22px}
+.bento-ui .section-head{margin-bottom:18px}
+.bento-ui .bento-table th{padding-top:11px;padding-bottom:11px}
+.bento-ui .bento-table td{padding-top:12px;padding-bottom:12px}
+.bento-ui .bento-create{padding-bottom:22px}
+.bento-ui .form-card,.bento-ui .preview-card{padding:23px!important}
+.bento-ui .form-stack{gap:16px}
+.bento-ui #profile-preview{min-height:245px;padding:19px}
+.bento-ui .create-bento-grid{gap:16px}
+.bento-ui .side-status{padding-top:12px}
+@media(max-width:780px){
+ .bento-ui .bento-main{padding:22px 15px}
+ .bento-ui .bento-side{padding:11px 14px}
+ .bento-ui .bento-stats .light-stat,.bento-ui .bento-stats .peach-stat{min-height:140px!important;padding:18px!important}
+ .bento-ui .header-tools{flex-wrap:wrap}
+}
+@media(max-width:470px){
+ .bento-ui .font-switch{width:100%;justify-content:space-between}
+ .bento-ui .font-switch select{max-width:65%}
+ .bento-ui .bento-stats .light-stat,.bento-ui .bento-stats .peach-stat{min-height:138px!important}
+}
