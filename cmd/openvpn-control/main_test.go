@@ -308,3 +308,51 @@ func TestSageStylesAndVersionedAssets(t *testing.T) {
         }
     }
 }
+
+
+func TestSelectableSageAndMistColorPalettes(t *testing.T) {
+    style, err := webFS.ReadFile("web/style.css")
+    if err != nil { t.Fatal(err) }
+    css := string(style)
+    for _, required := range []string{
+        "html[data-ui-theme=\"mist\"]",
+        "--bg:#f1f3f8",
+        "--ink:#293248",
+        "--mist-primary:#5d5aaa",
+        "html[data-ui-theme=\"mist\"] .kpi:nth-child(1)",
+        "html[data-ui-theme=\"mist\"] .table th",
+        "html[data-ui-theme=\"mist\"] .newform input",
+        "html[data-ui-theme=\"mist\"] .login-stage",
+        "html[data-ui-theme=\"mist\"] .login-aside",
+    } {
+        if !strings.Contains(css, required) { t.Errorf("Missing Mist palette rule %q", required) }
+    }
+    app, err := webFS.ReadFile("web/app.js")
+    if err != nil { t.Fatal(err) }
+    javascript := string(app)
+    for _, required := range []string{
+        "theme-choice",
+        "openvpn-control-theme",
+        "document.documentElement.dataset.uiTheme",
+        "localStorage.setItem('openvpn-control-theme'",
+        "new Set(['sage', 'mist'])",
+    } {
+        if !strings.Contains(javascript, required) { t.Errorf("Theme switcher missing %q", required) }
+    }
+    pages, err := template.New("pages").Funcs(template.FuncMap{"size":humanBytes}).ParseFS(webFS, "web/*.html")
+    if err != nil { t.Fatal(err) }
+    var dashboard strings.Builder
+    if err := pages.ExecuteTemplate(&dashboard, "dashboard.html", View{AssetVersion:assetVersion}); err != nil { t.Fatal(err) }
+    for _, required := range []string{
+        "id=\"theme-choice\"", "Тема", "Sage · шалфей", "Mist · лаванда",
+        "id=\"font-choice\"", "data-ui-theme=\"sage\"",
+    } {
+        if !strings.Contains(dashboard.String(), required) { t.Errorf("Dashboard missing %q", required) }
+    }
+    var login strings.Builder
+    v := struct { AssetVersion, CSRF string; Error, CSRFError bool }{assetVersion, "test", false, false}
+    if err := pages.ExecuteTemplate(&login, "login.html", v); err != nil { t.Fatal(err) }
+    if !strings.Contains(login.String(), "data-ui-theme=\"sage\"") {
+        t.Fatal("Login lacks fallback color theme before JS applies saved preference")
+    }
+}
