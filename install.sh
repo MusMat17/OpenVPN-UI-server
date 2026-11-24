@@ -71,9 +71,9 @@ if port_in_use tcp "$PANEL_PORT"; then
 fi
 
 while :; do
-  ask 'IPv4 of this server in local network' '192.168.40.10' BIND_IP
+  ask 'IPv4 of this server in local network' '192.168.1.100' BIND_IP
   if ! valid_ip "$BIND_IP"; then
-    warn 'enter an IPv4 address, for example 192.168.40.10'
+    warn 'enter an IPv4 address, for example 192.168.1.100'
     continue
   fi
   NIC=$(ip -4 -o addr show | awk -v addr="$BIND_IP" '$4 ~ ("^" addr "/") {print $2;exit}')
@@ -82,9 +82,9 @@ while :; do
 done
 
 while :; do
-  ask 'Target LAN network, routed through VPN ONLY' '192.168.40.0/24' LAN
+  ask 'Target LAN network, routed through VPN ONLY' '192.168.1.0/24' LAN
   if valid_net "$LAN"; then break; fi
-  warn 'enter a network in CIDR format, for example 192.168.40.0/24'
+  warn 'enter a network in CIDR format, for example 192.168.1.0/24'
 done
 
 while :; do

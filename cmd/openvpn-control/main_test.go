@@ -47,16 +47,16 @@ func TestLoginCSRFWithoutCookiesOverHTTPS(t *testing.T) {
     a := &App{cfg: Config{AdminHash: hashPassword("test-correct-password")}, t: tpl,
         sessions: make(map[string]Session), tries: make(map[string]Attempt), loginTokens: make(map[string]time.Time)}
     page := httptest.NewRecorder()
-    a.loginPage(page, httptest.NewRequest(http.MethodGet, "https://192.168.40.10:8989/login", nil))
+    a.loginPage(page, httptest.NewRequest(http.MethodGet, "https://192.168.1.100:8989/login", nil))
     if page.Code != http.StatusOK { t.Fatalf("GET login: %d", page.Code) }
     if len(page.Result().Cookies()) != 0 { t.Fatal("unexpected pre-login cookie") }
     var nonce string
     for token := range a.loginTokens { nonce = token }
     if nonce == "" || !strings.Contains(page.Body.String(), "value=\"" + nonce + "\"") { t.Fatal("form token missing") }
     form := url.Values{"csrf": {nonce}, "user": {"admin"}, "password": {"test-correct-password"}}
-    req := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+    req := httptest.NewRequest(http.MethodPost, "https://192.168.1.100:8989/login", strings.NewReader(form.Encode()))
     req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-    req.Header.Set("Origin", "https://192.168.40.10:8989")
+    req.Header.Set("Origin", "https://192.168.1.100:8989")
     response := httptest.NewRecorder()
     a.login(response, req)
     if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/" { t.Fatalf("login failed: %d %s", response.Code, response.Body.String()) }
@@ -69,9 +69,9 @@ func TestLoginCSRFWithoutCookiesOverHTTPS(t *testing.T) {
 func TestLoginCSRFRejectedAndRecoverable(t *testing.T) {
 	a := &App{cfg: Config{AdminHash: hashPassword("test-correct-password")}, sessions: make(map[string]Session), tries: make(map[string]Attempt)}
 	form := url.Values{"csrf": {"bogus"}, "user": {"admin"}, "password": {"test-correct-password"}}
-	req := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "https://192.168.1.100:8989/login", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Origin", "https://192.168.40.10:8989")
+	req.Header.Set("Origin", "https://192.168.1.100:8989")
 	response := httptest.NewRecorder()
 	a.login(response, req)
 	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/login?error=csrf" { t.Fatalf("unexpected missing CSRF behavior: %d", response.Code) }
@@ -84,8 +84,8 @@ func TestLoginCSRFRejectsCrossOriginAndExpiredToken(t *testing.T) {
     csrf := randomString(32)
     a.loginTokens[csrf] = time.Now().Add(10 * time.Minute)
     form := url.Values{"csrf": {csrf}, "user": {"admin"}, "password": {"test-correct-password"}}
-    for _, origin := range []string{"https://evil.example", "http://192.168.40.10:8989"} {
-        req := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+    for _, origin := range []string{"https://evil.example", "http://192.168.1.100:8989"} {
+        req := httptest.NewRequest(http.MethodPost, "https://192.168.1.100:8989/login", strings.NewReader(form.Encode()))
         req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
         if origin != "" { req.Header.Set("Origin", origin) }
         response := httptest.NewRecorder()
@@ -103,7 +103,7 @@ func TestLoginCSRFWorksWithoutOriginAndFetchMetadata(t *testing.T) {
     csrf := randomString(32)
     a.loginTokens[csrf] = time.Now().Add(10 * time.Minute)
     form := url.Values{"csrf": {csrf}, "user": {"admin"}, "password": {"test-correct-password"}}
-    request := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+    request := httptest.NewRequest(http.MethodPost, "https://192.168.1.100:8989/login", strings.NewReader(form.Encode()))
     request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
     response := httptest.NewRecorder()
     a.login(response, request)
@@ -117,7 +117,7 @@ func TestLoginCSRFRejectsExplicitCrossSiteFetchMetadata(t *testing.T) {
     csrf := randomString(32)
     a.loginTokens[csrf] = time.Now().Add(10 * time.Minute)
     form := url.Values{"csrf": {csrf}, "user": {"admin"}, "password": {"test-correct-password"}}
-    request := httptest.NewRequest(http.MethodPost, "https://192.168.40.10:8989/login", strings.NewReader(form.Encode()))
+    request := httptest.NewRequest(http.MethodPost, "https://192.168.1.100:8989/login", strings.NewReader(form.Encode()))
     request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
     request.Header.Set("Sec-Fetch-Site", "cross-site")
     response := httptest.NewRecorder()
@@ -140,14 +140,14 @@ func TestProfileTemplateDefaults(t *testing.T) {
     if strings.Contains(header, "{{") { t.Fatal("unexpanded placeholder") }
 }
 func TestProfileTemplateWANPortForwarding(t *testing.T) {
-    // User forwards public TCP/2253 to OpenVPN daemon TCP/1194.
+    // Example: router forwards public TCP/443 to OpenVPN daemon TCP/1194.
     settings := defaultProfile(1194)
-    settings.ExternalPort = 2253
+    settings.ExternalPort = 443
     settings.Template = strings.Replace(settings.Template, "verb 0", "verb 0\nconnect-retry-max 3", 1)
     header, err := buildProfileHeader(settings, "vpn.example.net", "tcp")
     if err != nil { t.Fatal(err) }
-    if !strings.Contains(header, "proto tcp-client\nremote vpn.example.net 2253\n") {
-        t.Fatalf("generated .ovpn does not use public port 2253: %s", header)
+    if !strings.Contains(header, "proto tcp-client\nremote vpn.example.net 443\n") {
+        t.Fatalf("generated .ovpn does not use public port 443: %s", header)
     }
     if strings.Contains(header, "vpn.example.net 1194") { t.Fatal("server-side listening port leaked into client profile") }
 }
@@ -178,9 +178,9 @@ func TestBentoDashboardRendersWithRealClients(t *testing.T) {
     tpl, err := template.New("pages").Funcs(template.FuncMap{"size": humanBytes}).ParseFS(webFS, "web/*.html")
     if err != nil { t.Fatalf("parse HTML dashboard: %v", err) }
     sample := View{
-        CSRF: "csrf-test", VPNProto: "TCP", VPNPort: "1194", BindIP: "192.168.40.10",
-        ClientProto: "tcp-client", LAN: "192.168.40.0/24", ExternalHost: "vpn.example.net",
-        ExternalPort: 2253, Verb: 0, Active: 1, Total: 1,
+        CSRF: "csrf-test", VPNProto: "TCP", VPNPort: "1194", BindIP: "192.168.1.100",
+        ClientProto: "tcp-client", LAN: "192.168.1.0/24", ExternalHost: "vpn.example.net",
+        ExternalPort: 443, Verb: 0, Active: 1, Total: 1,
         Rows: []Row{{Client: Client{Name: "laptop-01", Comment: "Notebook", Days: 365,
             ExpiresAt: time.Now().Add(365*24*time.Hour)}}},
     }
@@ -189,7 +189,7 @@ func TestBentoDashboardRendersWithRealClients(t *testing.T) {
         t.Fatalf("render dashboard: %v", err)
     }
     for _, expected := range []string{
-        "vpn.example.net", "2253", "1194", "csrf-test", "laptop-01",
+        "vpn.example.net", "443", "1194", "csrf-test", "laptop-01",
         "/clients/laptop-01/download", "/clients/laptop-01/disable",
         "/clients/laptop-01/delete", "/clients/laptop-01/comment",
         "name=\"external_host\"", "name=\"external_port\"", "name=\"verb\"",
@@ -198,16 +198,16 @@ func TestBentoDashboardRendersWithRealClients(t *testing.T) {
     }
 }
 func TestServerControlledClientProfile(t *testing.T) {
-    config, err := generateClientHeader("vpn.example.net", 2253, 0, "tcp")
+    config, err := generateClientHeader("vpn.example.net", 443, 0, "tcp")
     if err != nil { t.Fatal(err) }
     for _, piece := range []string{
-        "proto tcp-client", "remote vpn.example.net 2253", "verb 0",
+        "proto tcp-client", "remote vpn.example.net 443", "verb 0",
         "remote-cert-tls server", "pull-filter ignore \"redirect-gateway\"",
     } {
         if !strings.Contains(config, piece) { t.Errorf("profile missing %q", piece) }
     }
     for _, host := range []string{"foo bar", "host\nredirect-gateway", "https://host", "", "-bad.example"} {
-        if _, err := generateClientHeader(host, 2253, 0, "tcp"); err == nil {
+        if _, err := generateClientHeader(host, 443, 0, "tcp"); err == nil {
             t.Errorf("unsafe host %q accepted", host)
         }
     }
@@ -217,7 +217,7 @@ func TestServerControlledClientProfile(t *testing.T) {
         }
     }
     for _, v := range []int{-1, 12} {
-        if _, err := generateClientHeader("vpn.example.net", 2253, v, "udp"); err == nil {
+        if _, err := generateClientHeader("vpn.example.net", 443, v, "udp"); err == nil {
             t.Errorf("invalid verb %d accepted", v)
         }
     }
@@ -225,12 +225,12 @@ func TestServerControlledClientProfile(t *testing.T) {
 
 func TestManagementStatusAndPersistentConnectionTime(t *testing.T) {
     started := time.Now().Add(-45*time.Minute).UTC().Truncate(time.Second)
-    status := fmt.Sprintf("SUCCESS: password is correct\nTITLE,OpenVPN 2.6\nTIME,2026-10-29,1793230000\nHEADER,CLIENT_LIST,Common Name,Real Address,Virtual Address,Virtual IPv6 Address,Bytes Received,Bytes Sent,Connected Since,Connected Since (time_t),Username,Client ID,Peer ID,Data Channel Cipher\nCLIENT_LIST,laptop-01,198.51.100.44:1000,10.40.0.2,,2457,5894,2026-10-29,%d,UNDEF,1,1,AES-256-GCM\nEND\n", started.Unix())
+    status := fmt.Sprintf("SUCCESS: password is correct\nTITLE,OpenVPN 2.6\nTIME,2026-10-29,1793230000\nHEADER,CLIENT_LIST,Common Name,Real Address,Virtual Address,Virtual IPv6 Address,Bytes Received,Bytes Sent,Connected Since,Connected Since (time_t),Username,Client ID,Peer ID,Data Channel Cipher\nCLIENT_LIST,laptop-01,198.51.100.44:1000,10.9.0.2,,2457,5894,2026-10-29,%d,UNDEF,1,1,AES-256-GCM\nEND\n", started.Unix())
     online, err := parseManagementStatus(status)
     if err != nil { t.Fatal(err) }
     got, ok := online["laptop-01"]
     if !ok { t.Fatal("active connection missing") }
-    if !got.Since.Equal(started) || got.VirtualIP != "10.40.0.2" || got.In != 2457 {
+    if !got.Since.Equal(started) || got.VirtualIP != "10.9.0.2" || got.In != 2457 {
         t.Fatalf("unexpected status data: %#v", got)
     }
     clients := map[string]Client{"laptop-01": {Name:"laptop-01"}}

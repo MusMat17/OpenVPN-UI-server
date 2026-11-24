@@ -23,7 +23,7 @@ class WizardTests(unittest.TestCase):
             fake_bin = temp / 'bin'
             fake_bin.mkdir()
             for executable, script_text in {
-                'ip': '#!/bin/sh\necho "2: eth0 inet 192.168.40.10/24 scope global"\n',
+                'ip': '#!/bin/sh\necho "2: eth0 inet 192.168.1.100/24 scope global"\n',
                 'ss': '#!/bin/sh\nexit 0\n',
             }.items():
                 path = fake_bin / executable
@@ -34,8 +34,8 @@ class WizardTests(unittest.TestCase):
             entries = [
                 '',                  # server IP: default
                 '',                  # LAN: default
-                '192.168.40.0/24',   # invalid overlapping VPN net
-                '10.40.0.0/24',      # valid custom subnet regression
+                '192.168.1.0/24',   # invalid overlapping VPN net
+                '10.9.0.0/24',      # valid custom subnet regression
                 'wrong',             # invalid protocol
                 '  TCP  ',           # trim whitespace and allow uppercase
                 '99999',             # invalid port
@@ -59,7 +59,7 @@ class WizardTests(unittest.TestCase):
             )
             self.assertEqual(completed.returncode, 0, completed.stdout)
             self.assertIn('RESULT=tcp/443', completed.stdout)
-            self.assertIn('VPN 10.40.0.0/24', completed.stdout)
+            self.assertIn('VPN 10.9.0.0/24', completed.stdout)
             self.assertGreaterEqual(completed.stdout.count('Invalid value:'), 6)
 
 
