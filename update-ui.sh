@@ -27,4 +27,4 @@ if ! systemctl restart openvpn-control.service || ! systemctl is-active --quiet 
   exit 1
 fi
 echo "SUCCESS: UI updated. Previous binary: $BACKUP"
-echo 'Open https://192.168.40.10:8989/login and reload the page.'
+echo 'Open https://<server-ip>:8989/login and reload the page.'
