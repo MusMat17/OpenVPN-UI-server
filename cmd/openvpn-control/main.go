@@ -56,6 +56,11 @@ const (
 var cnPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,47}$`)
 
 type Config struct {
+    Backend string `json:"backend"`
+    Installer string `json:"installer"`
+    ManagementSocket string `json:"management_socket"`
+    ProfileDir string `json:"profile_dir"`
+
 	BindIP    string `json:"bind_ip"`
 	Port      int    `json:"port"`
 	VPNPort   int    `json:"vpn_port"`
@@ -212,6 +217,8 @@ type Row struct {
 	BytesOut  string
 }
 type View struct {
+    Attach bool
+
     AssetVersion string
     ServerReachable bool
 	Rows                                           []Row
@@ -268,6 +275,8 @@ func main() {
     if err := a.loadProfileSettings(); err != nil {
         log.Fatalf("profile settings: %v", err)
     }
+    if cfg.Backend != "" && cfg.Backend != "angristan" { log.Fatal("unsupported backend") }
+    if a.attached() { if err := a.syncAttached(); err != nil { log.Fatal(err) } }
     a.refreshConnections()
     go a.monitorConnections()
 	mux := http.NewServeMux()
@@ -556,7 +565,7 @@ func (a *App) dashboard(w http.ResponseWriter, r *http.Request) {
 			active++
 		}
 	}
-	v := View{AssetVersion: assetVersion, Rows: rows, Active: active, Total: len(rows), ServerReachable: serverReachable, CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalHost: profile.ExternalHost, ExternalPort: profile.ExternalPort, Verb: profile.Verb, BindIP: a.cfg.BindIP, ClientProto: map[bool]string{true:"tcp-client",false:"udp"}[a.cfg.VPNProto == "tcp"], Now: time.Now().Format("02.01.2006 15:04")}
+	v := View{Attach: a.attached(), AssetVersion: assetVersion, Rows: rows, Active: active, Total: len(rows), ServerReachable: serverReachable, CSRF: s.CSRF, Message: r.URL.Query().Get("msg"), VPNPort: strconv.Itoa(a.cfg.VPNPort), VPNProto: strings.ToUpper(a.cfg.VPNProto), LAN: a.cfg.LAN, VPNHost: a.cfg.VPNHost, ExternalHost: profile.ExternalHost, ExternalPort: profile.ExternalPort, Verb: profile.Verb, BindIP: a.cfg.BindIP, ClientProto: map[bool]string{true:"tcp-client",false:"udp"}[a.cfg.VPNProto == "tcp"], Now: time.Now().Format("02.01.2006 15:04")}
 	if e := a.t.ExecuteTemplate(w, "dashboard.html", v); e != nil {
 		log.Print(e)
 	}
@@ -579,6 +588,7 @@ func (a *App) createClient(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.attached() { a.createAttached(w,r,name,comment,days,host,publicPort,verb); return }
 	if _, ok := a.clients[name]; ok {
 		http.Error(w, "client name already used", 409)
 		return
@@ -625,6 +635,7 @@ func (a *App) createClient(w http.ResponseWriter, r *http.Request) {
 func (a *App) disableClient(w http.ResponseWriter, r *http.Request) { a.toggle(w, r, true) }
 func (a *App) enableClient(w http.ResponseWriter, r *http.Request)  { a.toggle(w, r, false) }
 func (a *App) toggle(w http.ResponseWriter, r *http.Request, disabled bool) {
+    if a.attached() { http.Error(w,"temporary blocking is not supported in attach mode",501); return }
 	name := r.PathValue("name")
 	if !validName(name) {
 		http.Error(w, "bad name", 400)
@@ -678,6 +689,7 @@ func (a *App) deleteClient(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", 404)
 		return
 	}
+	if a.attached() { a.revokeAttached(w,r,c); return }
 	// First revoke; always regenerate and deploy CRL, including on retry.
 	env := append(os.Environ(), "EASYRSA_BATCH=1", "EASYRSA_PKI="+filepath.Join(easyrsaDir, "pki"))
 	if !c.Revoked {
@@ -784,6 +796,7 @@ func (a *App) downloadClient(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", 404)
 		return
 	}
+	if a.attached() { a.downloadAttached(w,name); return }
 	pieces := []struct{ path, begin, end string }{
 		{filepath.Join(easyrsaDir, "pki/ca.crt"), "<ca>", "</ca>"},
 		{filepath.Join(easyrsaDir, "pki/issued", name+".crt"), "<cert>", "</cert>"},
@@ -985,16 +998,19 @@ func updateLastConnected(clients map[string]Client, online map[string]Live) bool
     return changed
 }
 func (a *App) refreshConnections() {
-    online, err := queryManagementConnections()
+    var online map[string]Live
+    var err error
+    if a.attached() { online,err = a.unixStatus() } else { online,err = queryManagementConnections() }
     reachable := err == nil
     if err != nil {
         // Fallback is only for the online-client snapshot. A management error
         // must not be presented as proof that the OpenVPN server is healthy.
-        online = readOnline()
+        if a.attached() { online = map[string]Live{} } else { online = readOnline() }
     }
     a.mu.Lock()
     defer a.mu.Unlock()
     a.serverReachable = reachable
+    if a.attached() { if err := a.syncAttached(); err != nil { log.Printf("attach inventory unavailable: %v",err) } }
     changed := updateLastConnected(a.clients, online)
     a.online = online
     if changed {

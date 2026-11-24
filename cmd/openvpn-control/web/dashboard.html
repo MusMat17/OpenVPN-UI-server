@@ -118,6 +118,7 @@
             <td>
               <div class="tools">
                 <a class="tool" href="/clients/{{.Name}}/download">↓ .ovpn</a>
+                {{if not $.Attach}}
                 {{if .Disabled}}
                 <form method="post" action="/clients/{{.Name}}/enable">
                   <input type="hidden" name="csrf" value="{{$.CSRF}}">
@@ -128,6 +129,7 @@
                   <input type="hidden" name="csrf" value="{{$.CSRF}}">
                   <button class="tool gray" type="submit" title="Заблокировать клиента" aria-label="Заблокировать клиента">Ⅱ</button>
                 </form>
+                {{end}}
                 {{end}}
                 <form method="post" action="/clients/{{.Name}}/delete" data-confirm="Отозвать сертификат {{.Name}}? Это необратимо.">
                   <input type="hidden" name="csrf" value="{{$.CSRF}}">
@@ -151,7 +153,7 @@
         <h2>＋ Новый клиент</h2>
         <p>Создание сертификата и параметров клиентского профиля</p>
       </div>
-      <span class="badge sand">Split tunnel · {{.LAN}}</span>
+      <span class="badge sand">{{if .Attach}}Attach Mode · Angristan{{else}}Split tunnel · {{.LAN}}{{end}}</span>
     </div>
     <div class="newgrid">
       <form id="client-form" method="post" action="/clients" class="newform" autocomplete="off">
@@ -204,9 +206,9 @@ persist-key
 persist-tun
 remote-cert-tls server
 auth-nocache
-pull-filter ignore "redirect-gateway"
+{{if not .Attach}}pull-filter ignore "redirect-gateway"{{else}}# маршрутизация из оригинального шаблона{{end}}
 verb <span id="preview-verb">{{.Verb}}</span>
-# сертификаты и tls-crypt добавляются автоматически</pre>
+# сертификаты и TLS-ключи добавляются автоматически</pre>
         </div>
       </div>
     </div>
